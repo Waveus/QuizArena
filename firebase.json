@@ -1,0 +1,1 @@
+{"flutter":{"platforms":{"android":{"default":{"projectId":"wam-quiz","appId":"1:194920975577:android:d2c6aafffdaab6504842c8","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"wam-quiz","configurations":{"android":"1:194920975577:android:d2c6aafffdaab6504842c8","ios":"1:194920975577:ios:d83b78839757f9ee4842c8"}}}}}}
