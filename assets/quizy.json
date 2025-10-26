@@ -1,0 +1,31 @@
+[
+  {
+    "quizId": "historia_swiata",
+    "name": "Historia Świata",
+    "description": "Quiz o najważniejszych wydarzeniach historycznych.",
+    "type": 1
+  },
+  {
+    "quizId": "geografia_europy",
+    "name": "Geografia Europy",
+    "description": "Sprawdź swoją wiedzę o stolicach i rzekach Europy.",
+    "type": 2
+  },
+  {
+    "quizId": "popkultura_2000",
+    "description": "Filmy",
+    "type": 3
+  },
+  {
+    "quizId": "biologia_komorki",
+    "name": "Biologia Komórki",
+    "description": "Szczegółowe pytania o budowę komórki.",
+    "type": 1
+  },
+  {
+    "quizId": "technologie_it",
+    "name": "IT",
+    "description": "Pytania o programowanie i sprzęt komputerowy.",
+    "type": 2
+  }
+]

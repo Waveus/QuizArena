@@ -2,6 +2,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_quizarena/services/auth_service.dart';
 
+import 'quiz_seeder.dart';
+
 class Login extends StatefulWidget{
   const Login({
     super.key,
@@ -26,6 +28,7 @@ class _LoginState extends State<Login> {
   void signIn() async {
     try {
       await authService.value.signIn(email: controllerEmail.text, password: controllerPassword.text);
+      await QuizSeeder.seedData();
       popPage();
     } on FirebaseAuthException catch (e) {
       setState(() {

@@ -1,0 +1,177 @@
+[
+  {
+    "quizId": "historia_swiata",
+    "questionID": 1,
+    "question": "Gdzie wynaleziono pismo klinowe?",
+    "answers": ["Mezopotamia", "Egipt", "Chiny", "Dolina Indusu"],
+    "answer": 0
+  },
+  {
+    "quizId": "historia_swiata",
+    "questionID": 2,
+    "question": "W którym roku upadło Cesarstwo Zachodniorzymskie?",
+    "answers": ["410 n.e.", "1453 n.e.", "476 n.e.", "395 n.e."],
+    "answer": 2
+  },
+  {
+    "quizId": "historia_swiata",
+    "questionID": 3,
+    "question": "Kto jest uznawany za 'odkrywcę' Ameryki w 1492?",
+    "answers": ["Ferdynand Magellan", "Vasco da Gama", "Krzysztof Kolumb", "Marco Polo"],
+    "answer": 2
+  },
+  {
+    "quizId": "historia_swiata",
+    "questionID": 4,
+    "question": "W jakich latach trwała II Wojna Światowa?",
+    "answers": ["1914-1918", "1939-145", "1941-1945", "1950-1953"],
+    "answer": 1
+  },
+  {
+    "quizId": "historia_swiata",
+    "questionID": 5,
+    "question": "W którym roku człowiek po raz pierwszy wylądował na Księżycu?",
+    "answers": ["1961", "1972", "1957", "1969"],
+    "answer": 3
+  },
+  {
+    "quizId": "geografia_europy",
+    "questionID": 1,
+    "question": "Jaka jest stolica Niemiec?",
+    "answers": ["Monachium", "Berlin", "Hamburg", "Frankfurt"],
+    "answer": 1
+  },
+  {
+    "quizId": "geografia_europy",
+    "questionID": 2,
+    "question": "Najdłuższa rzeka Europy to:",
+    "answers": ["Dunaj", "Ren", "Łaba", "Wołga"],
+    "answer": 3
+  },
+  {
+    "quizId": "geografia_europy",
+    "questionID": 3,
+    "question": "Najwyższy szczyt Europy (wliczając Kaukaz) to:",
+    "answers": ["Mont Blanc", "Elbrus", "Gerlach", "Matterhorn"],
+    "answer": 1
+  },
+  {
+    "quizId": "geografia_europy",
+    "questionID": 4,
+    "question": "Które państwo nie jest sąsiadem Polski?",
+    "answers": ["Litwa", "Słowacja", "Rumunia", "Czechy"],
+    "answer": 2
+  },
+  {
+    "quizId": "geografia_europy",
+    "questionID": 5,
+    "question": "W którym państwie leży Barcelona?",
+    "answers": ["Włochy", "Portugalia", "Hiszpania", "Francja"],
+    "answer": 2
+  },
+  {
+    "quizId": "popkultura_2000",
+    "questionID": 1,
+    "question": "Który film zdobył Oscara za Najlepszy Film za rok 2000?",
+    "answers": ["Gladiator", "Erin Brockovich", "Traffic", "Przyczajony tygrys, ukryty smok"],
+    "answer": 0
+  },
+  {
+    "quizId": "popkultura_2000",
+    "questionID": 2,
+    "question": "Jaki zespół wydał w 2000 roku album 'Hybrid Theory'?",
+    "answers": ["Korn", "Limp Bizkit", "Linkin Park", "System of a Down"],
+    "answer": 2
+  },
+  {
+    "quizId": "popkultura_2000",
+    "questionID": 3,
+    "question": "Jaka konsola gier zdominowała rynek po premierze w 2000 roku?",
+    "answers": ["Xbox", "Nintendo GameCube", "Sega Dreamcast", "Sony PlayStation 2"],
+    "answer": 3
+  },
+  {
+    "quizId": "popkultura_2000",
+    "questionID": 4,
+    "question": "Który z tych seriali miał premierę w 2000 roku?",
+    "answers": ["Lost: Zagubieni", "CSI: Kryminalne zagadki Las Vegas", "24 godziny", "Dr House"],
+    "answer": 1
+  },
+  {
+    "quizId": "popkultura_2000",
+    "questionID": 5,
+    "question": "Kto zaśpiewał hit 'Oops!... I Did It Again' w 2000 roku?",
+    "answers": ["Christina Aguilera", "Britney Spears", "Madonna", "Jennifer Lopez"],
+    "answer": 1
+  },
+  {
+    "quizId": "biologia_komorki",
+    "questionID": 1,
+    "question": "Który organellum jest nazywane 'elektrownią komórki'?",
+    "answers": ["Rybosom", "Mitochondrium", "Jądro komórkowe", "Aparat Golgiego"],
+    "answer": 1
+  },
+  {
+    "quizId": "biologia_komorki",
+    "questionID": 2,
+    "question": "Gdzie zachodzi proces fotosyntezy u roślin?",
+    "answers": ["Mitochondrium", "Ściana komórkowa", "Chloroplast", "Wodniczka"],
+    "answer": 2
+  },
+  {
+    "quizId": "biologia_komorki",
+    "questionID": 3,
+    "question": "Co jest głównym nośnikiem informacji genetycznej?",
+    "answers": ["RNA", "Białko", "ATP", "DNA"],
+    "answer": 3
+  },
+  {
+    "quizId": "biologia_komorki",
+    "questionID": 4,
+    "question": "Która struktura odpowiada za syntezę białek?",
+    "answers": ["Rybosomy", "Lizosomy", "Błona komórkowa", "Jądro"],
+    "answer": 0
+  },
+  {
+    "quizId": "biologia_komorki",
+    "questionID": 5,
+    "question": "Co oddziela wnętrze komórki od środowiska zewnętrznego?",
+    "answers": ["Cytoplazma", "Błona komórkowa", "Ściana komórkowa", "Jąderko"],
+    "answer": 1
+  },
+  {
+    "quizId": "technologie_it",
+    "questionID": 1,
+    "question": "Co oznacza skrót 'HTTP'?",
+    "answers": ["HyperText Transfer Protocol", "High Tech Transfer Protocol", "HyperText Transmission Policy", "HyperText Typewriter Protocol"],
+    "answer": 0
+  },
+  {
+    "quizId": "technologie_it",
+    "questionID": 2,
+    "question": "Który z poniższych jest językiem programowania, a nie językiem znaczników?",
+    "answers": ["HTML", "XML", "CSS", "Python"],
+    "answer": 3
+  },
+  {
+    "quizId": "technologie_it",
+    "questionID": 3,
+    "question": "Co oznacza 'CPU'?",
+    "answers": ["Central Processing Unit", "Computer Power Unit", "Central Peripheral Unit", "Core Programming Utility"],
+    "answer": 0
+  },
+  {
+    "quizId": "technologie_it",
+    "questionID": 4,
+    "question": "Na jakim systemie operacyjnym bazuje Android?",
+    "answers": ["Windows", "iOS", "Linux", "FreeBSD"],
+    "answer": 2
+  },
+  {
+    "quizId": "technologie_it",
+    "questionID": 5,
+    "question": "Czego używa się do stylowania stron internetowych?",
+    "answers": ["JavaScript", "PHP", "HTML", "CSS"],
+    "answer": 3
+  }
+]

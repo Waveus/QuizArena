@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_quizarena/friend_board.dart';
 import 'package:flutter_quizarena/global_board.dart';
 import 'package:flutter_quizarena/me.dart';
+import 'package:flutter_quizarena/quizes.dart';
 
 class AppLayout extends StatefulWidget{
   const AppLayout({super.key});
@@ -19,6 +20,7 @@ class _AppLayoutState extends State<AppLayout> {
     const GlobalBoard(),
     const FriendBoard(),
     const Me(),
+    const Quizes()
   ];
 
   @override
@@ -74,6 +76,10 @@ void _onItemTapped(int index) {
             icon: Icon(Icons.person),
             label: 'Me',
           ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.account_circle),
+            label: 'Quizes'
+          )
         ],
         currentIndex: _selectedIndex,
         onTap: _onItemTapped,
