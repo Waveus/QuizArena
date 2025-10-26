@@ -24,7 +24,7 @@ class _MeState extends State<Me> {
   }
 
 
-  void signOut() async {
+  Future<void> signOut() async {
     try {
         await authService.value.signOut();
     } on FirebaseException catch (e) {
@@ -43,7 +43,7 @@ class _MeState extends State<Me> {
     }
   }
 
-  void changePassword(String oldPassword, String newPassword) async {
+  Future<void> changePassword(String oldPassword, String newPassword) async {
     try {
         String email = authService.value.currentUser!.email!;
         await authService.value.resetPasswordFromCurrentPassword(currentPassword: oldPassword, newPassword: newPassword, email: email);
@@ -53,7 +53,7 @@ class _MeState extends State<Me> {
     }
   }
 
-    void deleteAccount(String email, String password) async {
+    Future<void> deleteAccount(String email, String password) async {
     try {
         String email = authService.value.currentUser!.email!;
         await authService.value.deleteAccount(email: email, password: password);
@@ -64,21 +64,40 @@ class _MeState extends State<Me> {
   }
   
   void showLogoutConfirmationDialog() {
+
+    String statusMessage = '';
+    final BuildContext safeContext = context;
+
     showDialog(
-      context: context,
-      builder: (context) {
+      context: safeContext,
+      builder: (BuildContext dialogContext) {
         return AlertDialog(
           title: const Text('Sign out confirmation'),
           content: const Text('Do you want to sign out?'),
           actions: <Widget>[
             TextButton(
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed: () => Navigator.of(dialogContext).pop(),
               child: const Text('Cancel'),
             ),
             FilledButton(
               onPressed: () {
-                Navigator.of(context).pop();
-                signOut();
+                Navigator.of(dialogContext).pop();
+                try {
+                  signOut();
+                  statusMessage = 'Succesfully sign out';
+                } on FirebaseException catch (e) {
+                  statusMessage = e.toString();
+                } 
+                if(safeContext.mounted){
+                  ScaffoldMessenger.of(safeContext).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        statusMessage
+                      ), 
+                      duration: Duration(seconds: 3),
+                    ),
+                  );
+                }
               },
               child: const Text('Sign Out'),
             ),
@@ -128,10 +147,11 @@ class _MeState extends State<Me> {
   String statusMessage = '';
   final TextEditingController oldPasswordController = TextEditingController();
   final TextEditingController newPasswordController = TextEditingController();
+  final BuildContext safeContext = context;
 
   showDialog(
-    context: context,
-    builder: (context) {
+    context: safeContext,
+    builder: (BuildContext dialogContext) {
       return AlertDialog(
         title: const Text('Change Password'),
         content: Column(
@@ -157,14 +177,14 @@ class _MeState extends State<Me> {
         ),
         actions: <Widget>[
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => Navigator.of(dialogContext).pop(),
             child: const Text('Cancel'),
           ),
           FilledButton(
-            onPressed: () {
-              Navigator.of(context).pop();
+            onPressed: () async {
+              Navigator.of(dialogContext).pop();
               try {
-                changePassword(
+                  await changePassword(
                     oldPasswordController.text, 
                     newPasswordController.text
                   );
@@ -172,14 +192,16 @@ class _MeState extends State<Me> {
               } on FirebaseException catch (e){
                 statusMessage = e.toString();
               }
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    statusMessage
-                  ), 
-                  duration: Duration(seconds: 3),
-                ),
-              );
+                if(safeContext.mounted){
+                  ScaffoldMessenger.of(safeContext).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        statusMessage
+                      ), 
+                      duration: Duration(seconds: 3),
+                    ),
+                  );
+                }
             },
             child: const Text('Change password'),
           ),
@@ -195,10 +217,11 @@ class _MeState extends State<Me> {
   final TextEditingController passwordController = TextEditingController();
 
   String statusMessage = '';
+  final BuildContext safeContext = context;
 
   showDialog(
-    context: context,
-    builder: (context) {
+    context: safeContext,
+    builder: (BuildContext dialogContext) {
       return AlertDialog(
         title: const Text('Delete Account'),
         content: Column(
@@ -224,14 +247,14 @@ class _MeState extends State<Me> {
         ),
         actions: <Widget>[
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => Navigator.of(dialogContext).pop(),
             child: const Text('Cancel'),
           ),
           FilledButton(
-            onPressed: () {
-              Navigator.of(context).pop();
+            onPressed: () async {
+              Navigator.of(dialogContext).pop();
               try {
-                deleteAccount(
+                await deleteAccount(
                     emailController.text, 
                     passwordController.text
                   );
@@ -239,14 +262,16 @@ class _MeState extends State<Me> {
               } on FirebaseException catch (e){
                 statusMessage = e.toString();
               }
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    statusMessage
-                  ), 
-                  duration: Duration(seconds: 3),
-                ),
-              );
+              if(safeContext.mounted) {
+                ScaffoldMessenger.of(safeContext).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      statusMessage
+                    ), 
+                    duration: Duration(seconds: 3),
+                  ),
+                );
+              }
             },
             child: const Text('Delete Account'),
           ),
