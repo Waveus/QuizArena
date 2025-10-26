@@ -1,16 +1,20 @@
 import 'dart:math';
 
+  //Conflict
+  //Conflict
 import 'package:cloud_firestore/cloud_firestore.dart';
+  //Conflict
+    //Conflict
 import 'package:flutter/material.dart';
 import 'package:flutter_quizarena/services/auth_service.dart';
-
+  //Conflict
 import 'package:flutter/material.dart';
 
 //Konflikt
-
+  //Conflict
 class Me extends StatefulWidget {
   const Me({super.key});
-
+  //Conflict
   @override
   State<Me> createState() => _MeState();
 }
@@ -18,13 +22,14 @@ class Me extends StatefulWidget {
 class _MeState extends State<Me> {
   String _userName = 'User';
   bool _isLoadingName = true;
-  
+    //Conflict
   @override
   void initState() {
     super.initState();
     loadUserName();
   }
 
+  //Conflict
 
   Future<void> signOut() async {
     try {
