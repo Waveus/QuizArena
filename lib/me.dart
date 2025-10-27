@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_quizarena/me_quizes.dart';
+import 'package:flutter_quizarena/models/User';
+import 'package:flutter_quizarena/repositories/UserRepository.dart';
 import 'package:flutter_quizarena/services/auth_service.dart';
 
 class Me extends StatefulWidget {
@@ -10,12 +12,11 @@ class Me extends StatefulWidget {
 }
 
 class _MeState extends State<Me> {
-  String _userName = 'User';
-  bool _isLoadingName = true;
+  final UserRepository userRepository = UserRepository();
+  String? currentUserId = authService.value.currentUser?.uid;
   @override
   void initState() {
     super.initState();
-    loadUserName();
   }
 
   Future<void> signOut() async {
@@ -23,17 +24,6 @@ class _MeState extends State<Me> {
         await authService.value.signOut();
     } on FirebaseException catch (e) {
       print(e);
-    }
-  }
-
-  void loadUserName() async {
-    await Future.delayed(const Duration(milliseconds: 500)); 
-    //TODO Prawidzwe fetchowane z bazy ogniowej
-    if (mounted) {
-      setState(() {
-        _userName = 'Alicja';
-        _isLoadingName = false;
-      });
     }
   }
 
@@ -104,30 +94,39 @@ class _MeState extends State<Me> {
   void showChangeUsernameDialog() {
 
   final TextEditingController nameController = TextEditingController();
-
+  final BuildContext safeContext = context;
+  String statusMessage = '';
   showDialog(
-    context: context,
-    builder: (context) {
+    context: safeContext  ,
+    builder: (BuildContext dialogContext) {
       return AlertDialog(
         title: const Text('Change Username'),
         content: TextField(controller: nameController),
         actions: <Widget>[
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => Navigator.of(dialogContext).pop(),
             child: const Text('Cancel'),
           ),
           FilledButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    'TODO: Add username change ${nameController.text}'
-                  ), 
-                  duration: Duration(seconds: 3),
-                ),
-              );
-              //TODO: Change Username in bazie ogniowej
+            onPressed: () async {
+              Navigator.of(dialogContext).pop();
+              try {
+                await userRepository.updateUsername(currentUserId!, nameController.text);
+                statusMessage = 'Username change success'; 
+              }
+              catch (e){
+                statusMessage = e.toString();
+              }
+              if(safeContext.mounted) {
+                ScaffoldMessenger.of(safeContext).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      statusMessage
+                    ), 
+                    duration: Duration(seconds: 3),
+                  ),
+                );
+              }
             },
             child: const Text('Change username'),
           ),
@@ -282,22 +281,27 @@ class _MeState extends State<Me> {
       body: Padding(
         padding: const EdgeInsets.all(20.0),
         child: Column(
-
           crossAxisAlignment: CrossAxisAlignment.stretch, 
           children: <Widget>[
-            if (_isLoadingName)
-              const Center(child: CircularProgressIndicator())
-            else
-              Text(
-                'Welcome, $_userName!',
+            StreamBuilder<UserModel?>(
+            stream: userRepository.streamUserData(currentUserId!),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              final username = snapshot.data?.username ?? 'stranger';
+              return Text(
+                'Welcome, $username!',
                 style: const TextStyle(
                   fontSize: 28, 
                   fontWeight: FontWeight.bold,
                 ),
                 textAlign: TextAlign.center,
-              ),
-            const Spacer(), 
+              );
+            },
+          ),
 
+            Spacer(),
             ElevatedButton(
               onPressed: () {
                 Navigator.push(

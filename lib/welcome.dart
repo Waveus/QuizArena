@@ -19,28 +19,26 @@ class _WelcomeState extends State<Welcome> {
         ),
         body: Center(
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center, // Centrowanie pionowe
+            mainAxisAlignment: MainAxisAlignment.center,
             children: <Widget>[
               Image.asset(
                 'assets/logo.png',
                 height: 250,
               ),
-              const SizedBox(height: 50), // Odstęp
+              const SizedBox(height: 50),
 
-              // Przycisk 1: Getting Started (do Register)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 10),
                 child: ElevatedButton(
                   onPressed: () {
-                    // Przejście do RegisterScreen
                     Navigator.of(context).push(
                       MaterialPageRoute(
-                        builder: (context) => const Register(), // Użyj swojej klasy Register
+                        builder: (context) => const Register(),
                       ),
                     );
                   },
                   style: ElevatedButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 50), // Przycisk na całą szerokość
+                    minimumSize: const Size(double.infinity, 50),
                   ),
                   child: const Text(
                     "Get Started",
@@ -49,20 +47,18 @@ class _WelcomeState extends State<Welcome> {
                 ),
               ),
 
-              // Przycisk 2: Login (do Login)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 10),
                 child: OutlinedButton(
                   onPressed: () {
-                    // Przejście do LoginScreen
                     Navigator.of(context).push(
                       MaterialPageRoute(
-                        builder: (context) => const Login(), // Użyj swojej klasy Login
+                        builder: (context) => const Login(),
                       ),
                     );
                   },
                   style: OutlinedButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 50), // Przycisk na całą szerokość
+                    minimumSize: const Size(double.infinity, 50),
                   ),
                   child: const Text(
                     "Sign In",

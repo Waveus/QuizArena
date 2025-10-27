@@ -1,0 +1,22 @@
+class UserModel {
+  final String uid;
+  final String username;
+
+  UserModel({
+    required this.uid,
+    required this.username
+  });
+
+  factory UserModel.fromFirestore(Map<String, dynamic> data, String uid) {
+    return UserModel(
+      uid: uid,
+      username: data['username'] ?? 'null',
+    );
+  }
+
+  Map<String, dynamic> toFirestore() {
+    return {
+      'username': username,
+    };
+  }
+}

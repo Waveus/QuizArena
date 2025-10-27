@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_quizarena/repositories/UserRepository.dart';
 import 'package:flutter_quizarena/services/auth_service.dart';
 
 import 'quiz_seeder.dart';
@@ -13,6 +14,8 @@ class Register extends StatefulWidget{
 }
 
 class _RegisterState extends State<Register> {
+  UserRepository userRepository = UserRepository();
+  TextEditingController controllerUsername = TextEditingController();
   TextEditingController controllerEmail = TextEditingController();
   TextEditingController controllerPassword = TextEditingController();
   final formKey = GlobalKey<FormState>();
@@ -27,15 +30,40 @@ class _RegisterState extends State<Register> {
 
   void register() async {
     try {
+      String username = controllerUsername.text;
+      bool isUnique = await userRepository.isUsernameUnique(username);
+      if(!isUnique) {
+        setState(() {
+          errorMessage = 'This username is already taken';
+        });
+        return;
+      } 
+
       await authService.value.createAccount(
         email: controllerEmail.text, 
         password: controllerPassword.text
       );
-      await QuizSeeder.seedData();
-      popPage();
+      String currentUserId = authService.value.currentUser!.uid;
+
+      try {
+        await userRepository.createUser(currentUserId, username);
+        await QuizSeeder.seedData();
+        popPage();
+        //Ok
+      } catch (e) {
+        //Rollback
+        await authService.value.currentUser!.delete();
+        setState(() {
+            errorMessage = 'Cannot save profie data, try again';
+        });
+      }
     } on FirebaseAuthException catch (e) {
       setState(() {
           errorMessage = e.message ?? 'Error';
+      });
+    } on Exception catch (e)  {
+      setState(() {
+          errorMessage = 'Unknown exception';
       });
     }
   }
@@ -63,6 +91,16 @@ class _RegisterState extends State<Register> {
                 fontSize: 20.0,
               )),
             SizedBox(height: 32),
+            
+            TextField(
+              controller: controllerUsername,
+              decoration: InputDecoration(
+                labelText: "Username",
+                border: OutlineInputBorder(),
+              ),
+              keyboardType: TextInputType.name,
+            ),
+            SizedBox(height: 16),
 
             TextField(
               controller: controllerEmail,
