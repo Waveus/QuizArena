@@ -3,8 +3,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_quizarena/models/QuizMetadata';
 import 'package:flutter_quizarena/repositories/QuizRepository.dart';
-// import 'quiz_repository.dart'; // Załóżmy, że repozytorium jest tutaj
-// import 'quiz_metadata.dart'; // Załóżmy, że model jest tutaj
 
 class MeQuizes extends StatefulWidget {
   const MeQuizes({super.key});
