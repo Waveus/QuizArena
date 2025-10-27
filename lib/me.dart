@@ -1,6 +1,6 @@
-import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_quizarena/me_quizes.dart';
 import 'package:flutter_quizarena/services/auth_service.dart';
 
 class Me extends StatefulWidget {
@@ -297,6 +297,24 @@ class _MeState extends State<Me> {
                 textAlign: TextAlign.center,
               ),
             const Spacer(), 
+
+            ElevatedButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => MeQuizes()),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size(double.infinity, 50),
+                padding: const EdgeInsets.symmetric(vertical: 15),
+              ),
+              child: const Text(
+                'See avaliable Quizes',
+                style: TextStyle(fontSize: 18),
+              ),
+            ),
+            const SizedBox(height: 10),
 
             ElevatedButton(
               onPressed: showChangeUsernameDialog,

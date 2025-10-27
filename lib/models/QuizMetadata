@@ -1,0 +1,22 @@
+class QuizMetadata {
+  final String id;
+  final String name;
+  final String ownerId;
+  final String accessType;
+
+  QuizMetadata({
+    required this.id,
+    required this.name,
+    required this.ownerId,
+    required this.accessType,
+  });
+
+  factory QuizMetadata.fromFirestore(Map<String, dynamic> data, String id) {
+    return QuizMetadata(
+      id: id,
+      name: data['name'] ?? 'null',
+      ownerId: data['ownerID'] ?? 'null',
+      accessType: data['accessType'] ?? 'null',
+    );
+  }
+}
