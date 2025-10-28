@@ -2,10 +2,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 
-// --- DODAJ IMPORT KLUCZA Z APP_LAYOUT ---
-// (Upewnij się, że ścieżka do app_layout.dart jest poprawna)
-import 'package:flutter_quizarena/app_layout.dart';
-// ------------------------------------
 
 class LobbyScreen extends StatefulWidget {
   final String roomID;
@@ -39,12 +35,9 @@ class _LobbyScreenState extends State<LobbyScreen> {
     }
     _roomRef = _db.ref('rooms/${widget.roomID}');
 
-    // Wywołaj setupPresence, ALE strumień przypiszemy dopiero PO jego zakończeniu
-    // aby uniknąć potencjalnego wyścigu
     _checkIfHostAndSetupPresence().then((_) {
       if (mounted) {
         print("Przypisanie strumienia _roomStream po _checkIfHostAndSetupPresence.");
-        // Użyj setState, aby StreamBuilder złapał nowy strumień
         setState(() {
           _roomStream = _roomRef.onValue;
         });
@@ -55,7 +48,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
   Future<void> _checkIfHostAndSetupPresence() async {
      print("_checkIfHost: Sprawdzanie istnienia pokoju...");
     final roomSnapshot = await _roomRef.get();
-    if (!mounted) return; // Sprawdź mounted po await
+    if (!mounted) return;
 
     if (!roomSnapshot.exists) {
       print("BŁĄD KRYTYCZNY: Pokój ${widget.roomID} nie istnieje w _checkIfHost!");
@@ -70,13 +63,10 @@ class _LobbyScreenState extends State<LobbyScreen> {
     _isHost = (hostData is String && hostData == _user!.uid);
     print("Użytkownik ${_user!.uid} jest hostem: $_isHost");
 
-    // Odśwież UI (np. żeby pokazać przycisk Start)
-    // Zrobimy to w głównym setState po zakończeniu tej funkcji
      if (mounted) {
       setState(() {});
     }
 
-    // Ustaw onDisconnect
     if (_isHost) {
        await _roomRef.onDisconnect().remove().catchError((e) {
          print("Błąd ustawiania onDisconnect dla hosta: $e");
@@ -84,7 +74,6 @@ class _LobbyScreenState extends State<LobbyScreen> {
        print("Reguły onDisconnect dla hosta ustawione (usuwanie pokoju).");
     } else {
       final playerRef = _roomRef.child('players/${_user!.uid}');
-      // Usunęliśmy onDisconnect dla playerCount
       try {
         await playerRef.onDisconnect().remove();
         print("Reguły onDisconnect dla gracza ${_user!.uid} (tylko usunięcie z listy) ustawione.");
@@ -167,7 +156,6 @@ class _LobbyScreenState extends State<LobbyScreen> {
   Widget build(BuildContext context) {
     print("LobbyScreen build method called. _roomStream is null: ${_roomStream == null}");
 
-    // Jeśli strumień jest null (bo initState jeszcze go nie ustawił), pokaż ładowanie
     if (_roomStream == null) {
        return Scaffold(
           appBar: AppBar(title: const Text('Lobby')),
@@ -181,7 +169,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () async {
-            print("Prosty przycisk Wstecz naciśnięty (jawny klucz)..."); // Zmieniono tekst
+            print("Prosty przycisk Wstecz naciśnięty (jawny klucz)...");
             try {
               await _cancelOnDisconnectRules();
               await _performLeaveAction();
@@ -189,9 +177,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
                print("Błąd podczas wychodzenia (przycisk wstecz): $e");
             } finally {
                if (mounted) {
-                 // --- UŻYJ JAWNIE KLUCZA ---
-                 friendBoardNavigatorKey.currentState?.pop();
-                 // ------------------------
+                 Navigator.pop(context,true);
                  print("Wywołano pop() na friendBoardNavigatorKey po ręcznym wyjściu.");
                }
             }
@@ -199,31 +185,25 @@ class _LobbyScreenState extends State<LobbyScreen> {
         ),
       ),
       body: StreamBuilder(
-        stream: _roomStream!, // Teraz mamy pewność, że nie jest null
+        stream: _roomStream!,
         builder: (context, AsyncSnapshot<DatabaseEvent> snapshot) {
-
-          // 1. Stan ładowania LUB brak pierwszych danych
           if (snapshot.connectionState != ConnectionState.active && !snapshot.hasData) {
             print("StreamBuilder: State = Waiting for initial data...");
             return const Center(child: CircularProgressIndicator());
           }
 
-          // 2. Obsługa błędu strumienia
           if (snapshot.hasError) {
             print("StreamBuilder: Stream has error: ${snapshot.error}");
             return Center(child: Text('Error listening to room: ${snapshot.error}'));
           }
 
-          // 3. Sprawdź, czy dane (snapshot.value) stały się null PO tym jak były dane
           final roomDataRaw = snapshot.data?.snapshot.value;
           if (snapshot.connectionState == ConnectionState.active && roomDataRaw == null) {
               print("StreamBuilder: Data received as null (Room likely deleted by host)");
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 if (mounted) {
                   print("StreamBuilder: Popping LobbyScreen because room data became null.");
-                  // Użyj jawnie klucza, jeśli to pomoże
-                  friendBoardNavigatorKey.currentState?.pop();
-                  // Navigator.of(context).pop();
+                  Navigator.pop(context,true);
                   ScaffoldMessenger.maybeOf(context)?.showSnackBar(
                      const SnackBar(content: Text('Room closed by host.')),
                    );
@@ -232,16 +212,13 @@ class _LobbyScreenState extends State<LobbyScreen> {
               return const Center(child: Text('Room closed by host...'));
           }
 
-          // 4. Jeśli dane są nadal null (bardzo wczesny stan?) - czekaj
            if (roomDataRaw == null) {
               print("StreamBuilder: Data is still null, but connection active. Waiting...");
               return const Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Colors.orange)));
            }
 
-          // --- Od tego momentu mamy pewność, że dane istnieją i nie są null ---
           print("StreamBuilder: Data received and is not null.");
 
-          // Bezpieczne rzutowanie
           Map<String, dynamic> roomData;
           if (roomDataRaw is Map) {
              roomData = Map<String, dynamic>.from(roomDataRaw);
@@ -250,32 +227,18 @@ class _LobbyScreenState extends State<LobbyScreen> {
              return const Center(child: Text('Incorrect room data format.'));
           }
 
-          // Parsowanie danych
           final String roomName = roomData['roomName'] ?? 'Unnamed Room';
           final String quizTitle = (roomData['quiz'] is Map ? roomData['quiz']['title'] : null) ?? 'No Quiz Selected';
           final int playerCount = roomData['playerCount'] ?? 0;
           final int playerLimit = roomData['playerLimit'] ?? 2;
           final String status = roomData['status'] ?? 'waiting';
 
-          // Gra się rozpoczęła
           if (status == 'in_game') {
             print("StreamBuilder: Game status 'in_game'. Navigating...");
             // TODO: Nawigacja do GameScreen
-            /*
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) {
-                // Użyj pushReplacement na ZAGNIEŻDŻONYM nawigatorze
-                friendBoardNavigatorKey.currentState?.pushReplacement(
-                  MaterialPageRoute(builder: (context) => GameScreen(roomID: widget.roomID))
-                );
-                // Navigator.of(context).pushReplacement(...); // To by działało na najbliższym
-              }
-            });
-            */
             return const Center(child: Text('Game starting...'));
           }
 
-          // Parsowanie listy graczy
           final Map<String, dynamic> playersMap = roomData['players'] is Map
               ? Map<String, dynamic>.from(roomData['players'] as Map)
               : {};
@@ -288,7 +251,6 @@ class _LobbyScreenState extends State<LobbyScreen> {
                })
               .toList();
 
-          // Budowanie widoku lobby
           return Padding(
             padding: const EdgeInsets.all(16.0),
             child: Column(
@@ -363,7 +325,7 @@ class _LobbyScreenState extends State<LobbyScreen> {
    @override
    void dispose() {
      print("LobbyScreen dispose method called.");
-     _cancelOnDisconnectRules(); // Wywołaj bez await
+     _cancelOnDisconnectRules();
      super.dispose();
    }
 }
