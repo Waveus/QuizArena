@@ -3,15 +3,8 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_quizarena/models/QuizMetadata';
-
-// === IMPORTY, KTÓRYCH MOGŁO BRAKOWAĆ ===
-// (Upewnij się, że ścieżki pasują do struktury Twojego projektu)
-
-// 3. Import Ekranu Lobby (KLUCZOWY DO NAWIGACJI)
+import 'package:flutter_quizarena/repositories/QuizRepository.dart';
 import 'package:flutter_quizarena/lobby_screen.dart';
-import 'package:flutter_quizarena/repositories/QuizRepository.dart'; 
-
-// ===========================================
 
 class GlobalBoard extends StatefulWidget {
   const GlobalBoard({super.key});
@@ -20,138 +13,159 @@ class GlobalBoard extends StatefulWidget {
   State<GlobalBoard> createState() => _GlobalBoardState();
 }
 
-class _GlobalBoardState extends State<GlobalBoard> {
+class _GlobalBoardState extends State<GlobalBoard>
+    with AutomaticKeepAliveClientMixin {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseDatabase _db = FirebaseDatabase.instance;
-  
-  // Utwórz instancję repozytorium
   final QuizRepository _quizRepository = QuizRepository();
 
-  // Ta funkcja JEDYNIE OTWIERA nowe okno dialogowe
-  void _showCreateRoomDialog(BuildContext context) {
-    showDialog(
+  void _showCreateRoomDialog(BuildContext context) async {
+    final String? newRoomId = await showDialog<String?>(
       context: context,
-      // Używamy naszego nowego widgetu, przekazując mu potrzebne zależności
+      barrierDismissible: false,
       builder: (BuildContext dialogContext) {
         return _CreateRoomDialog(
           quizRepository: _quizRepository,
           onCreateRoom: (roomName, playerLimit, selectedQuiz) async {
-            // Ta funkcja zostanie wywołana przez okno dialogowe
-            // Zmieniliśmy ją na async, aby poczekać na stworzenie pokoju
-            String? newRoomId = await _createRoom(roomName, playerLimit, selectedQuiz);
-            
-            if (newRoomId != null && mounted) {
-              // --- NAWIGACJA PO STWORZENIU POKOJU ---
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => LobbyScreen(roomID: newRoomId),
-                ),
-              );
-            }
+            final createdRoomId =
+                await _createRoom(roomName, playerLimit, selectedQuiz);
+            return createdRoomId;
           },
         );
       },
     );
+
+    if (newRoomId != null && mounted) {
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => LobbyScreen(
+              roomID: newRoomId, currentUserId: _auth.currentUser!.uid),
+        ),
+      );
+    } else if (newRoomId == null && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to create room.')),
+      );
+    }
   }
 
-  // Zwraca ID pokoju lub null, jeśli się nie udało
   Future<String?> _createRoom(
-    String roomName,
-    int playerLimit,
-    QuizMetadata selectedQuiz, 
-  ) async {
+      String roomName, int playerLimit, QuizMetadata selectedQuiz) async {
     final User? user = _auth.currentUser;
-    if (user == null) return null; 
+    if (user == null) {
+      return null;
+    }
 
     final DatabaseReference roomsRef = _db.ref('rooms');
-    final DatabaseReference newRoomRef = roomsRef.push(); 
+    final DatabaseReference newRoomRef = roomsRef.push();
 
     final roomData = {
       'host': user.uid,
-      'roomName': roomName, 
+      'roomName': roomName,
       'status': 'waiting',
       'playerLimit': playerLimit,
       'playerCount': 1,
-      'quiz': {
-        'id': selectedQuiz.id,
-        'title': selectedQuiz.name,
-      },
+      'quiz': {'id': selectedQuiz.id, 'title': selectedQuiz.name},
       'players': {
-        user.uid: {
-          'displayName': user.displayName ?? 'Host', 
-        }
+        user.uid: {'displayName': user.displayName ?? 'Host'}
       }
     };
 
     try {
       await newRoomRef.set(roomData);
-      await newRoomRef.onDisconnect().remove();
-      return newRoomRef.key; // Zwróć ID nowego pokoju
+      final snap = await newRoomRef.get();
+      await newRoomRef.onDisconnect().remove(); 
+      return newRoomRef.key;
     } catch (e) {
-      print("Error creating room: $e");
       return null;
     }
   }
 
-  // Funkcja dołączania do pokoju (używa transakcji)
   Future<void> _joinRoom(String roomID) async {
     final User? user = _auth.currentUser;
-    if (user == null) return; 
+    if (user == null) {
+      return;
+    }
 
     final DatabaseReference roomRef = _db.ref('rooms/$roomID');
 
     try {
-      final TransactionResult result = await roomRef.runTransaction((Object? roomData) {
-        if (roomData == null) {
-          return Transaction.abort(); 
-        }
-
-        Map<String, dynamic> room = Map<String, dynamic>.from(roomData as Map);
-        
-        final bool isWaiting = room['status'] == 'waiting';
-        final bool hasSpace = (room['playerCount'] as int) < (room['playerLimit'] as int);
-
-        if (isWaiting && hasSpace) {
-          room['playerCount'] = (room['playerCount'] as int) + 1;
-          
-          if (room['players'] == null) {
-             room['players'] = {};
+      final TransactionResult result = await roomRef.runTransaction(
+        (Object? roomData) {
+          if (roomData == null) {
+            return Transaction.abort();
           }
-          (room['players'] as Map)[user.uid] = {
-            'displayName': user.displayName ?? 'Player'
-          };
-          
-          return Transaction.success(room);
-        } else {
-          return Transaction.abort();
-        }
-      });
+
+          Map<String, dynamic> room;
+          if (roomData is Map) {
+            room = Map<String, dynamic>.from(roomData);
+          } else {
+            return Transaction.abort();
+          }
+
+          final bool isWaiting = room['status'] == 'waiting';
+          final bool hasSpace = (room['playerCount'] is int &&
+                  room['playerLimit'] is int)
+              ? (room['playerCount'] as int) < (room['playerLimit'] as int)
+              : false;
+          final bool alreadyJoined =
+              (room['players'] as Map?)?.containsKey(user.uid) ?? false;
+
+          if (isWaiting && hasSpace && !alreadyJoined) {
+            room['playerCount'] = (room['playerCount'] as int) + 1;
+
+            if (room['players'] is! Map) {
+              room['players'] = <String, dynamic>{};
+            }
+
+            (room['players'] as Map)[user.uid] = {
+              'displayName': user.displayName ?? 'Player'
+            };
+            return Transaction.success(room);
+          } else {
+            if (isWaiting && alreadyJoined) {
+               return Transaction.success(roomData); 
+            }
+            return Transaction.abort();
+          }
+        },
+      );
 
       if (result.committed) {
-        print("Successfully joined room!");
-        
-        // --- NAWIGACJA PO DOŁĄCZENIU DO POKOJU ---
         if (mounted) {
-           Navigator.of(context).push(
+          await Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (context) => LobbyScreen(roomID: roomID),
+              builder: (context) => LobbyScreen(
+                roomID: roomID,
+                currentUserId: _auth.currentUser!.uid, 
+              ),
             ),
           );
         }
       } else {
-        print("Failed to join room (full, in game, or deleted).");
-        // TODO: Pokaż błąd (pokój pełny)
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content:
+                    Text('Failed to join room (full, in game, or does not exist).')),
+          );
+        }
       }
     } catch (e) {
-      print("Error joining room: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error joining room: $e')),
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final Query roomsQuery = _db.ref('rooms')
-                                .orderByChild('status')
-                                .equalTo('waiting');
+    super.build(context);
+
+    final Query roomsQuery =
+        _db.ref('rooms').orderByChild('status').equalTo('waiting');
 
     return Scaffold(
       appBar: AppBar(
@@ -162,47 +176,56 @@ class _GlobalBoardState extends State<GlobalBoard> {
         icon: const Icon(Icons.add),
         label: const Text('New Room'),
       ),
-      
-      body: StreamBuilder(
-        stream: roomsQuery.onValue, 
-        builder: (context, AsyncSnapshot<DatabaseEvent> snapshot) {
-          
+      body: StreamBuilder<DatabaseEvent>(
+        stream: roomsQuery.onValue,
+        builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
-          
-          if (!snapshot.hasData || snapshot.hasError) {
-            return const Center(child: Text('Error loading rooms.'));
+
+          if (snapshot.hasError) {
+            return Center(
+                child: Text('Error loading rooms: ${snapshot.error}'));
           }
 
           final data = snapshot.data?.snapshot.value;
-          if (data == null) {
-            return const Center(
-              child: Text(
-                'No available rooms.\nCreate one!',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 18),
+          final roomsList = <Map<String, dynamic>>[];
+
+          if (data != null && data is Map) {
+            data.forEach((key, value) {
+              if (value is Map) {
+                roomsList.add({'id': key, ...Map<String, dynamic>.from(value)});
+              }
+            });
+          }
+
+          if (roomsList.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text(
+                    'No available rooms.\nCreate one!',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 18),
+                  ),
+                  const SizedBox(height: 20),
+                  ElevatedButton(
+                    onPressed: () => _showCreateRoomDialog(context),
+                    child: const Text('Create Room'),
+                  )
+                ],
               ),
             );
           }
-          
-          final Map<String, dynamic> roomsMap = Map<String, dynamic>.from(data as Map);
-
-          final List<Map<String, dynamic>> roomsList = roomsMap.entries.map((entry) {
-            return {
-              'id': entry.key,
-              ...Map<String, dynamic>.from(entry.value as Map)
-            };
-          }).toList();
 
           return ListView.builder(
             itemCount: roomsList.length,
             itemBuilder: (context, index) {
               final room = roomsList[index];
-              return RoomListItem( 
+              return RoomListItem(
                 room: room,
                 onJoin: (roomID) async {
-                  // --- CZEKAMY (AWAIT) NA DOŁĄCZENIE ---
                   await _joinRoom(roomID);
                 },
               );
@@ -212,16 +235,16 @@ class _GlobalBoardState extends State<GlobalBoard> {
       ),
     );
   }
-}
 
-// =======================================================================
-// WIDGET: OKNO DIALOGOWE TWORZENIA POKOJU
-// =======================================================================
+  @override
+  bool get wantKeepAlive => true;
+}
 
 class _CreateRoomDialog extends StatefulWidget {
   final QuizRepository quizRepository;
-  // Funkcja zwrotna (teraz asynchroniczna)
-  final Future<void> Function(String roomName, int playerLimit, QuizMetadata selectedQuiz) onCreateRoom;
+  final Future<String?> Function(
+          String roomName, int playerLimit, QuizMetadata selectedQuiz)
+      onCreateRoom;
 
   const _CreateRoomDialog({
     required this.quizRepository,
@@ -236,9 +259,10 @@ class _CreateRoomDialogState extends State<_CreateRoomDialog> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final TextEditingController _roomNameController = TextEditingController();
   final TextEditingController _limitController = TextEditingController();
-  
+
   QuizMetadata? _selectedQuiz;
   late final Stream<List<QuizMetadata>> _quizzesStream;
+  bool _isCreating = false;
 
   @override
   void initState() {
@@ -256,7 +280,6 @@ class _CreateRoomDialogState extends State<_CreateRoomDialog> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // --- Pole Nazwy Pokoju ---
               TextFormField(
                 controller: _roomNameController,
                 decoration: const InputDecoration(labelText: 'Room Name'),
@@ -268,11 +291,10 @@ class _CreateRoomDialogState extends State<_CreateRoomDialog> {
                 },
               ),
               const SizedBox(height: 16),
-              
-              // --- Pole Limitu Graczy ---
               TextFormField(
                 controller: _limitController,
-                decoration: const InputDecoration(labelText: 'Player Limit (e.g., 8)'),
+                decoration:
+                    const InputDecoration(labelText: 'Player Limit (2-16)'),
                 keyboardType: TextInputType.number,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 validator: (value) {
@@ -287,27 +309,49 @@ class _CreateRoomDialogState extends State<_CreateRoomDialog> {
                 },
               ),
               const SizedBox(height: 16),
-
-              // --- Dropdown z Quizami ---
               StreamBuilder<List<QuizMetadata>>(
                 stream: _quizzesStream,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
+                    return const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 20.0),
+                      child: Center(child: CircularProgressIndicator()),
+                    );
                   }
-                  if (!snapshot.hasData || snapshot.hasError) {
-                    return Text('Error loading quizzes: ${snapshot.error}');
+                  if (snapshot.hasError) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 20.0),
+                      child: Text('Error loading quizzes: ${snapshot.error}',
+                          style: const TextStyle(color: Colors.red)),
+                    );
                   }
-                  if (snapshot.data!.isEmpty) {
-                    return const Text('No available quizzes found.');
+                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                    return const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 20.0),
+                      child: Text('No available quizzes found.'),
+                    );
                   }
 
                   final quizzes = snapshot.data!;
 
+                  if (_selectedQuiz != null &&
+                      !quizzes.any((q) => q.id == _selectedQuiz!.id)) {
+                    _selectedQuiz = null;
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted) setState(() {});
+                    });
+                  }
+                  
+                  if (_selectedQuiz == null && quizzes.isNotEmpty) {
+                    _selectedQuiz = quizzes.first;
+                  }
+
                   return DropdownButtonFormField<QuizMetadata>(
                     value: _selectedQuiz,
                     hint: const Text('Select a Quiz'),
-                    decoration: const InputDecoration(border: OutlineInputBorder()),
+                    isExpanded: true,
+                    decoration:
+                        const InputDecoration(border: OutlineInputBorder()),
                     items: quizzes.map((quiz) {
                       return DropdownMenuItem<QuizMetadata>(
                         value: quiz,
@@ -338,24 +382,36 @@ class _CreateRoomDialogState extends State<_CreateRoomDialog> {
       actions: [
         TextButton(
           child: const Text('Cancel'),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: _isCreating ? null : () => Navigator.of(context).pop(null),
         ),
         ElevatedButton(
-          child: const Text('Create'),
-          onPressed: () async { // <-- 1. Dodaj 'async'
-            // Sprawdź, czy formularz jest poprawny
+          child: _isCreating 
+              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) 
+              : const Text('Create'),
+          onPressed: _isCreating ? null : () async {
             if (_formKey.currentState!.validate()) {
-              
-              // 2. Zaczekaj (await), aż funkcja tworzenia pokoju się wykona
-              await widget.onCreateRoom(
+              setState(() { _isCreating = true; }); 
+
+              final createdId = await widget.onCreateRoom(
                 _roomNameController.text.trim(),
                 int.parse(_limitController.text),
                 _selectedQuiz!,
               );
-              
-              // 3. Dopiero teraz zamknij okno dialogowe
+
               if (mounted) {
-                 Navigator.of(context).pop(); 
+                 setState(() { _isCreating = false; });
+              }
+             
+              if (createdId != null && mounted) {
+                Navigator.of(context).pop(createdId);
+              } else if (mounted) {
+                 ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Failed to create room. Please try again.')));
+              }
+            } else {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Form validation failed!')));
               }
             }
           },
@@ -365,14 +421,9 @@ class _CreateRoomDialogState extends State<_CreateRoomDialog> {
   }
 }
 
-
-// =======================================================================
-// WIDGET: ELEMENT LISTY POKOI
-// =======================================================================
-
 class RoomListItem extends StatelessWidget {
   final Map<String, dynamic> room;
-  final Future<void> Function(String roomID) onJoin; // Funkcja (teraz asynchroniczna)
+  final Future<void> Function(String roomID) onJoin;
 
   const RoomListItem({
     super.key,
@@ -382,24 +433,30 @@ class RoomListItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final String roomID = room['id'] ?? '...';
+    final String roomID = room['id'] ?? 'UNKNOWN_ID';
     final String roomName = room['roomName'] ?? 'Unnamed Room';
-    final String quizTitle = room['quiz']?['title'] ?? 'No Quiz Selected'; 
+    final String quizTitle =
+        (room['quiz'] is Map ? room['quiz']['title'] : null) ??
+            'No Quiz Selected';
     final int playerCount = room['playerCount'] ?? 0;
-    final int playerLimit = room['playerLimit'] ?? 0;
+    final int playerLimit = room['playerLimit'] ?? 2;
+
+    if (roomID == 'UNKNOWN_ID') return const SizedBox.shrink();
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
       child: ListTile(
-        title: Text(roomName, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text('Quiz: $quizTitle\nPlayers: $playerCount / $playerLimit'),
+        title:
+            Text(roomName, style: const TextStyle(fontWeight: FontWeight.bold)),
+        subtitle:
+            Text('Quiz: $quizTitle\nPlayers: $playerCount / $playerLimit'),
         trailing: ElevatedButton(
-          onPressed: () async { // <-- 1. Dodaj 'async'
-            await onJoin(roomID); // <-- 2. Dodaj 'await'
+          onPressed: () async {
+            await onJoin(roomID);
           },
           child: const Text('Join'),
         ),
-        isThreeLine: true, 
+        isThreeLine: true,
       ),
     );
   }
