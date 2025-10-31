@@ -17,11 +17,11 @@ class _MeQuizesState extends State<MeQuizes> {
   @override
   Widget build(BuildContext context) {
     if (currentUserId == null) {
-      return const Center(child: Text("Błąd: Użytkownik nie jest zalogowany."));
+      return const Center(child: Text("Error: Current user not signed in."));
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Moje Quizy')),
+      appBar: AppBar(title: const Text('My Quizes')),
       body: StreamBuilder<List<QuizMetadata>>(
         stream: quizRepository.getAvailableQuizzesStream(), 
         
@@ -32,7 +32,7 @@ class _MeQuizesState extends State<MeQuizes> {
           }
 
           if (snapshot.hasError) {
-            return Center(child: Text('Błąd ładowania: ${snapshot.error}'));
+            return Center(child: Text('Login issue: ${snapshot.error}'));
           }
 
           final myQuizzes = snapshot.data ?? [];
@@ -40,7 +40,7 @@ class _MeQuizesState extends State<MeQuizes> {
           if (myQuizzes.isEmpty) {
             return const Center(
               child: Text(
-                'Nie masz jeszcze żadnych utworzonych quizów.',
+                'You have no quiz created yet',
                 style: TextStyle(fontSize: 16, color: Colors.grey),
               ),
             );
@@ -60,11 +60,11 @@ class _MeQuizesState extends State<MeQuizes> {
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                   subtitle: Text(
-                    'Dostęp: ${quiz.accessType == 'public' ? 'Publiczny' : 'Prywatny'}',
+                    'Access: ${quiz.accessType}',
                   ),
                   trailing: const Icon(Icons.arrow_forward_ios, size: 16),
                   onTap: () {
-                    print('Wybrano quiz do edycji: ${quiz.name}');
+                    print('Selected quiz for editon: ${quiz.name}');
                   },
                 ),
               );
