@@ -61,6 +61,7 @@ class UserRepository {
       rethrow;
     }
   }
+  
   Future<bool> isUsernameUnique(String username) async {
     try {
       final normalizedUsername = username.trim().toLowerCase();

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_quizarena/me_quizes.dart';
 import 'package:flutter_quizarena/models/User';
 import 'package:flutter_quizarena/repositories/UserRepository.dart';
+import 'package:flutter_quizarena/repositories/me_friends.dart';
 import 'package:flutter_quizarena/services/auth_service.dart';
 
 class Me extends StatefulWidget {
@@ -302,6 +303,23 @@ class _MeState extends State<Me> {
           ),
 
             Spacer(),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => MeFriends()),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size(double.infinity, 50),
+                padding: const EdgeInsets.symmetric(vertical: 15),
+              ),
+              child: const Text(
+                'Friends',
+                style: TextStyle(fontSize: 18),
+              ),
+            ),
+            const SizedBox(height: 10),
             ElevatedButton(
               onPressed: () {
                 Navigator.push(
