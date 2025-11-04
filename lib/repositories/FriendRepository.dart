@@ -122,7 +122,7 @@ Stream<List<UserModel>> streamFriendList(String userId) {
 
 Future<void> handleFriendRequest(String senderId, String action) async {
   if (_auth.currentUser == null) {
-      throw Exception('Użytkownik nie jest zalogowany. Brak tokena uwierzytelniającego.');
+      throw Exception('User not authenticated.');
     }
     try {
       final HttpsCallable callable = _functions.httpsCallable('handleFriendRequest');
