@@ -6,11 +6,9 @@ import 'package:flutter_quizarena/models/QuizMetadata';
 import 'package:flutter_quizarena/repositories/QuizRepository.dart';
 import 'package:flutter_quizarena/lobby_screen.dart';
 
-// [NOWE] Importy potrzebne do łączenia strumieni i filtrowania znajomych
 import 'package:rxdart/rxdart.dart';
 import 'package:flutter_quizarena/repositories/FriendRepository.dart';
 import 'package:flutter_quizarena/repositories/UserRepository.dart';
-import 'package:flutter_quizarena/models/User';
 
 class FriendBoard extends StatefulWidget {
   const FriendBoard({super.key});
@@ -22,7 +20,6 @@ class FriendBoard extends StatefulWidget {
 class _FriendBoardState extends State<FriendBoard>
     with AutomaticKeepAliveClientMixin {
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  // [ZMIANA] Używamy Firestore zamiast FirebaseDatabase
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final QuizRepository _quizRepository = QuizRepository();
 
@@ -50,12 +47,10 @@ class _FriendBoardState extends State<FriendBoard>
         .where('status', isEqualTo: 'waiting')
         .snapshots();
 
-    // [NOWE] Połącz je w jeden strumień
     _combinedStream = Rx.combineLatest2(
       friendIdsStream,
       roomsStream,
       (Set<String> friendIds, QuerySnapshot roomsSnapshot) {
-        // Zwróć mapę, aby łatwiej przekazać oba wyniki do StreamBuilder
         return {
           'friendIds': friendIds,
           'roomsSnapshot': roomsSnapshot,
@@ -64,8 +59,6 @@ class _FriendBoardState extends State<FriendBoard>
     );
   }
 
-  // Funkcja _showCreateRoomDialog (bez zmian w logice)
-  // Automatycznie użyje zaktualizowanego `_quizRepository`
   void _showCreateRoomDialog(BuildContext context) async {
     final String? newRoomId = await showDialog<String?>(
       context: context,
@@ -96,7 +89,6 @@ class _FriendBoardState extends State<FriendBoard>
     }
   }
 
-  // [ZMIANA] Przepisane na Firestore
   Future<String?> _createRoom(
       String roomName, int playerLimit, QuizMetadata selectedQuiz) async {
     final User? user = _auth.currentUser;
@@ -104,7 +96,6 @@ class _FriendBoardState extends State<FriendBoard>
       return null;
     }
 
-    // [ZMIANA] Referencja do kolekcji Firestore
     final CollectionReference roomsRef = _firestore.collection('rooms');
 
     final roomData = {
@@ -117,35 +108,27 @@ class _FriendBoardState extends State<FriendBoard>
       'players': {
         user.uid: {'displayName': user.displayName ?? 'Host'}
       },
-      // [NOWE] Kluczowe pole do czyszczenia "martwych pokoi"
       'createdAt': FieldValue.serverTimestamp(), 
     };
 
     try {
-      // [ZMIANA] Używamy .add()
       final DocumentReference newRoomRef = await roomsRef.add(roomData);
 
-      // [UWAGA] Brak .onDisconnect().remove()
-      // Problem "martwych pokoi" musi być rozwiązany inaczej (np. Cloud Function)
-
-      return newRoomRef.id; // [ZMIANA] Zwracamy ID dokumentu
+      return newRoomRef.id;
     } catch (e) {
       return null;
     }
   }
 
-  // [ZMIANA] Przepisane na Transakcje Firestore
   Future<void> _joinRoom(String roomID) async {
     final User? user = _auth.currentUser;
     if (user == null) {
       return;
     }
 
-    // [ZMIANA] Referencja do dokumentu Firestore
     final DocumentReference roomRef = _firestore.collection('rooms').doc(roomID);
 
     try {
-      // [ZMIANA] Tak wygląda transakcja w Firestore
       await _firestore.runTransaction((Transaction transaction) async {
         final DocumentSnapshot roomSnapshot = await transaction.get(roomRef);
 
@@ -156,7 +139,6 @@ class _FriendBoardState extends State<FriendBoard>
         final Map<String, dynamic> room =
             roomSnapshot.data() as Map<String, dynamic>;
 
-        // Logika sprawdzająca (bez zmian)
         final bool isWaiting = room['status'] == 'waiting';
         final bool hasSpace =
             (room['playerCount'] as int) < (room['playerLimit'] as int);
@@ -164,25 +146,20 @@ class _FriendBoardState extends State<FriendBoard>
             (room['players'] as Map).containsKey(user.uid);
 
         if (isWaiting && hasSpace && !alreadyJoined) {
-          // [ZMIANA] Aktualizujemy dane za pomocą obiektu transakcji
           transaction.update(roomRef, {
             'playerCount': FieldValue.increment(1),
-            // Użyj notacji kropkowej do zagnieżdżonych obiektów
             'players.${user.uid}': {
               'displayName': user.displayName ?? 'Player'
             }
           });
         } else if (isWaiting && alreadyJoined) {
-          // Już dołączył, nie rób nic, ale pozwól na sukces
           return;
         } else {
-          // Nie można dołączyć (pełny, w grze itp.)
           throw Exception(
               "Failed to join room (full, in game, or does not exist).");
         }
       });
 
-      // Jeśli transakcja się powiodła, przejdź do lobby
       if (mounted) {
         await Navigator.of(context).push(
           MaterialPageRoute(
@@ -451,13 +428,6 @@ class _CreateRoomDialogState extends State<_CreateRoomDialog> {
           onPressed: _isCreating ? null : () => Navigator.of(context).pop(null),
         ),
         ElevatedButton(
-          child: _isCreating
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2, color: Colors.white))
-              : const Text('Create'),
           onPressed: _isCreating
               ? null
               : () async {
@@ -488,6 +458,13 @@ class _CreateRoomDialogState extends State<_CreateRoomDialog> {
                     }
                   }
                 },
+          child: _isCreating
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white))
+              : const Text('Create'),
         ),
       ],
     );
