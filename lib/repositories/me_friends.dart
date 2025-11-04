@@ -16,6 +16,52 @@ class _MeFriendsState extends State<MeFriends> {
   final UserRepository userRepository = UserRepository();
   final String? currentUserId = FirebaseAuth.instance.currentUser?.uid;
 
+
+  void showAddDialog() {
+
+  final TextEditingController nameController = TextEditingController();
+  final BuildContext safeContext = context;
+  String statusMessage = '';
+  showDialog(
+    context: safeContext  ,
+    builder: (BuildContext dialogContext) {
+      return AlertDialog(
+        title: const Text('Add friend'),
+        content: TextField(controller: nameController),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              Navigator.of(dialogContext).pop();
+              try {
+                await friendRepository.sendRequest(nameController.text);
+                statusMessage = 'Username added'; 
+              }
+              catch (e){
+                statusMessage = e.toString();
+              }
+              if(safeContext.mounted) {
+                ScaffoldMessenger.of(safeContext).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      statusMessage
+                    ), 
+                    duration: Duration(seconds: 3),
+                  ),
+                );
+              }
+            },
+            child: const Text('Add friend'),
+          ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
      if (currentUserId == null) {
@@ -40,7 +86,7 @@ class _MeFriendsState extends State<MeFriends> {
     if (combinedList.isEmpty) {
       return const Center(
         child: Text(
-          'No data',
+          'No friends yet',
           style: TextStyle(fontSize: 16, color: Colors.grey),
         ),
       );
@@ -53,8 +99,8 @@ class _MeFriendsState extends State<MeFriends> {
         final item = combinedList[index];
 
         if (item is UserModel) {
-          final isSenderSection = combinedList.sublist(0, index).contains('HEADER_SENDERS') && 
-                                  !combinedList.sublist(0, index).contains('HEADER_FRIENDS');
+          final isSenderSection = combinedList.sublist(0, index).contains('HEADER_SENDERS');
+          final isFriendSection = combinedList.sublist(0, index).contains('HEADER_FRIENDS');
           return Card(
             elevation: 2,
             margin: const EdgeInsets.only(bottom: 10),
@@ -72,7 +118,7 @@ class _MeFriendsState extends State<MeFriends> {
                         icon: const Icon(Icons.check, color: Colors.green),
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(),
-                        onPressed: () { /* TODO: Accept */ },
+                        onPressed: () async { await friendRepository.acceptRequest(item.uid);},
                       ),
                       const SizedBox(width: 10),
 
@@ -80,11 +126,36 @@ class _MeFriendsState extends State<MeFriends> {
                         icon: const Icon(Icons.close, color: Colors.red),
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(),
-                        onPressed: () { /* TODO: Deny */ },
+                        onPressed: () async { await friendRepository.denyRequest(item.uid); },
                       ),
                     ],
                   )
-                : null, // Null for friends
+                : isFriendSection
+                ?
+                  IconButton(
+                    icon: const Icon(Icons.delete, color: Colors.grey),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    onPressed: () async {
+                      try {
+                        await friendRepository.removeFriend(item.uid);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('User ${item.username} deleted'),
+                            duration: const Duration(seconds: 3),
+                          ),
+                        );} catch (e) {
+                        String errorMessage = e.toString();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Error: $errorMessage'),
+                            duration: const Duration(seconds: 3),
+                          ),
+                        );
+                      }
+                    },
+                  )
+                : null,
             ),
           );
         }
@@ -93,7 +164,11 @@ class _MeFriendsState extends State<MeFriends> {
       },
     );
   },
-)
+),
+floatingActionButton: FloatingActionButton(
+        onPressed:  showAddDialog,
+        child: const Icon(Icons.add),
+      )
       );
   }
 }

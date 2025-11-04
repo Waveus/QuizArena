@@ -4,13 +4,11 @@ class FriendRequestModel {
   final String id;
   final String senderId;
   final String receiverId;
-  final String status;
   
   FriendRequestModel({
       required this.id,
       required this.senderId,
-      required this.receiverId,
-      required this.status
+      required this.receiverId
     });
 
   factory FriendRequestModel.fromFirestore(DocumentSnapshot doc) {
@@ -23,8 +21,7 @@ class FriendRequestModel {
     return FriendRequestModel(
       id: doc.id,
       senderId: data['sender'] as String,
-      receiverId: data['receiver'] as String,
-      status: data['status'] as String
+      receiverId: data['receiver'] as String
     );
   }
 }
