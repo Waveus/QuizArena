@@ -35,7 +35,7 @@ class UserRepository {
     return _firestore
         .collection(_usersCollection)
         .doc(uid)
-        .snapshots() // Zwraca Stream<DocumentSnapshot>
+        .snapshots()
         .map((docSnapshot) {
           if (docSnapshot.exists) {
             return UserModel.fromFirestore(docSnapshot.data() as Map<String, dynamic>, uid);
