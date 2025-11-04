@@ -1,20 +1,58 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_quizarena/models/User';
 import 'package:flutter_quizarena/models/FriendRequestModel';
 import 'package:rxdart/rxdart.dart';
 
 class FriendRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseFunctions _functions = FirebaseFunctions.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+
   final String _userCollection = 'user_data';
   final String _friendCollection = 'friends';
   final String _friendRequestCollection = 'friend_request';
+  
 
-  Future<void> sendRequest(String senderId, String receiverId) async {
-    String uniqueId = senderId + receiverId;
-    await _firestore.collection(_friendRequestCollection).doc(uniqueId).set({
-      'sender': senderId,
-      'receiver': receiverId,
-    }, SetOptions(merge: true));
+  Future<void> sendRequest(String receiverName) async {
+    final senderId = _auth.currentUser?.uid;
+    if (senderId == null) {
+      throw Exception("User not authenticated.");
+    }
+
+    try {
+      final userSnapshot = await _firestore
+          .collection('user_data')
+          .where('username', isEqualTo: receiverName)
+          .limit(1)
+          .get();
+
+      if (userSnapshot.docs.isEmpty) {
+        throw Exception("User with specific name not found");
+      }
+      
+      final receiverId = userSnapshot.docs.first.id; 
+      
+      if (senderId == receiverId) {
+        throw Exception("You cannot send request to yourself");
+      }
+
+      final HttpsCallable callable = _functions.httpsCallable('sendFriendRequest');
+
+      final response = await callable.call(<String, dynamic>{
+        'receiverId': receiverId, 
+      });
+      if (response.data != null && response.data['success'] == true) {
+        return; 
+      } else {
+         throw Exception(response.data['message'] ?? 'Unkown error.');
+      }
+    } on FirebaseFunctionsException catch (e) {
+      throw Exception('Firebase Error: ${e.message}');
+    } catch (e) {
+      throw Exception('Error: ${e.toString()}');
+    }
   }
 
   Stream<List<dynamic>> streamCombinedFriendData(String userId) {
@@ -40,8 +78,7 @@ class FriendRepository {
   Stream<List<UserModel>> streamIncomingRequestSenders(String userId) {
     return _firestore
         .collection(_friendRequestCollection)
-        .where('reciever', isEqualTo: userId)
-        .where('status', isEqualTo: 'pending')
+        .where('receiver', isEqualTo: userId)
         .snapshots()
         .asyncMap((QuerySnapshot requestSnapshot) async {            
                 final senderUids = requestSnapshot.docs
@@ -83,24 +120,30 @@ Stream<List<UserModel>> streamFriendList(String userId) {
       });
 }
 
-  Future<void> acceptRequest(String requestId) async {
-   try {
-      await _firestore.collection(_friendRequestCollection).doc(requestId).update({'status': 'accepted'});
+Future<void> handleFriendRequest(String senderId, String action) async {
+  if (_auth.currentUser == null) {
+      throw Exception('Użytkownik nie jest zalogowany. Brak tokena uwierzytelniającego.');
+    }
+    try {
+      final HttpsCallable callable = _functions.httpsCallable('handleFriendRequest');
+    
+      await callable.call({
+        'senderId': senderId, 
+        'action': action,
+      });
+    } on FirebaseFunctionsException catch (e) {
+      throw Exception('Error: (${action}): ${e.message}'); 
     } catch (e) {
-      rethrow;
+      throw Exception('Unknown Error: $e');
     }
   }
 
-  Future<void> denyRequest(String requestId) async {
-    try {
-      await _firestore
-          .collection(_friendRequestCollection)
-          .doc(requestId)
-          .update({
-            'status': 'accepted',
-          });
-    } catch (e) {
-      rethrow;
-    }
+Future<void> acceptRequest(String senderId) async {
+    await handleFriendRequest(senderId, 'accept');
+  }
+
+Future<void> denyRequest(String senderId) async {
+    await handleFriendRequest(senderId, 'reject');
   }
 }
+

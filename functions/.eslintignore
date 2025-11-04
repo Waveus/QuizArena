@@ -1,0 +1,4 @@
+# .eslintignore
+
+# Wyłącza sprawdzanie pliku index.js
+index.js
