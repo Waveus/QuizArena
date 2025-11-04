@@ -145,5 +145,23 @@ Future<void> acceptRequest(String senderId) async {
 Future<void> denyRequest(String senderId) async {
     await handleFriendRequest(senderId, 'reject');
   }
+
+Future<void> removeFriend(String friendId) async {
+  if (_auth.currentUser == null) {
+      throw Exception('User not authenticated.');
+    }
+    try {
+      final HttpsCallable callable = _functions.httpsCallable('removeFriend');
+    
+      await callable.call({
+        'friendId': friendId,
+      });
+    } on FirebaseFunctionsException catch (e) {
+      throw Exception('Error: ${e.message}'); 
+    } catch (e) {
+      throw Exception('Unknown Error: $e');
+    }
+  } 
 }
+
 

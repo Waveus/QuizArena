@@ -16,12 +16,10 @@ exports.handleFriendRequest = onCall(async (request) => {
     const timestamp = admin.firestore.FieldValue.serverTimestamp(); 
     
     if (!senderId) {
-        logger.warn("No senderId");
         throw new HttpsError('invalid-argument', 'No sender id provided');
     }
     
     if (action !== 'accept' && action !== 'reject') {
-        logger.warn(`Invalid action: ${action}`);
         throw new HttpsError('invalid-argument', 'Action must be accept or reject.');
     }
 
@@ -71,8 +69,7 @@ exports.handleFriendRequest = onCall(async (request) => {
 
 exports.sendFriendRequest = onCall(async (request) => {
     if (!request.auth) { 
-        logger.error("Brak uwierzytelnienia użytkownika.");
-        throw new HttpsError('unauthenticated', 'Wymagane uwierzytelnienie.');
+        throw new HttpsError('unauthenticated', 'Reauth required');
     }
 
     const { receiverId } = request.data;
@@ -121,5 +118,53 @@ exports.sendFriendRequest = onCall(async (request) => {
             throw error;
         }
         throw new HttpsError('internal', 'Internal error', error.toString());
+    }
+});
+
+exports.removeFriend = onCall(async (request) => {
+    
+    if (!request.auth) {
+        throw new HttpsError('unauthenticated', 'ReAuth needed');
+    }
+
+    const { friendId } = request.data;
+    const currentUserId = request.auth.uid;
+    
+    if (!friendId) {
+        throw new HttpsError('invalid-argument', 'No ID to delete');
+    }
+
+    if (currentUserId === friendId) {
+        throw new HttpsError('invalid-argument', 'You cannot delete yourself');
+    }
+
+    try {
+        const db = admin.firestore();
+        
+        await db.runTransaction(async (transaction) => {
+            
+            const userRef = db.collection('user_data').doc(currentUserId)
+                               .collection('friends').doc(friendId); 
+            
+            const friendRef = db.collection('user_data').doc(friendId)
+                                 .collection('friends').doc(currentUserId);
+
+            const userDoc = await transaction.get(userRef);
+            
+            if (!userDoc.exists) {
+                 throw new HttpsError('not-found', 'This user is not your friend');
+            }
+
+            transaction.delete(userRef);
+            transaction.delete(friendRef);
+        });
+
+        return { success: true, message: "Friend deleted successfully" };
+
+    } catch (error) {
+        if (error instanceof HttpsError) {
+            throw error;
+        }
+        throw new HttpsError('internal', 'Internal server error.', error.toString());
     }
 });

@@ -99,8 +99,8 @@ class _MeFriendsState extends State<MeFriends> {
         final item = combinedList[index];
 
         if (item is UserModel) {
-          final isSenderSection = combinedList.sublist(0, index).contains('HEADER_SENDERS') && 
-                                  !combinedList.sublist(0, index).contains('HEADER_FRIENDS');
+          final isSenderSection = combinedList.sublist(0, index).contains('HEADER_SENDERS');
+          final isFriendSection = combinedList.sublist(0, index).contains('HEADER_FRIENDS');
           return Card(
             elevation: 2,
             margin: const EdgeInsets.only(bottom: 10),
@@ -129,6 +129,31 @@ class _MeFriendsState extends State<MeFriends> {
                         onPressed: () async { await friendRepository.denyRequest(item.uid); },
                       ),
                     ],
+                  )
+                : isFriendSection
+                ?
+                  IconButton(
+                    icon: const Icon(Icons.delete, color: Colors.grey),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    onPressed: () async {
+                      try {
+                        await friendRepository.removeFriend(item.uid);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('User ${item.username} deleted'),
+                            duration: const Duration(seconds: 3),
+                          ),
+                        );} catch (e) {
+                        String errorMessage = e.toString();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Error: $errorMessage'),
+                            duration: const Duration(seconds: 3),
+                          ),
+                        );
+                      }
+                    },
                   )
                 : null,
             ),
