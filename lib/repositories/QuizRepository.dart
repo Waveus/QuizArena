@@ -3,13 +3,17 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_quizarena/models/QuizMetadata';
 import 'package:flutter_quizarena/models/User';
 import 'package:flutter_quizarena/repositories/FriendRepository.dart';
+import 'package:flutter_quizarena/repositories/UserRepository.dart';
 import 'package:flutter_quizarena/services/auth_service.dart';
+import 'package:flutter_quizarena/repositories/FriendRepository.dart';
 import 'package:rxdart/rxdart.dart';
 
 class QuizRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final UserRepository _userRepository = UserRepository();
   final FriendRepository _friendRepository = FriendRepository();
+
   Stream<List<QuizMetadata>> getAvailableQuizzesStream() {
     final userQuizzes = _firestore
         .collection('quiz')
@@ -89,10 +93,35 @@ class QuizRepository {
     return chunks;
   }
 
-  Stream<List<QuizMetadata>> getMyQuizzesStream(String currentUserId) {
+  Stream<List<QuizMetadata>> getFriendsQuizzes() {
+    String currentUserID = AuthService().currentUser!.uid;
+    return _friendRepository.streamFriendList(currentUserID).switchMap((List<UserModel> friends){
+      final List<String> friendIds = friends
+        .map((userModel) => userModel.uid)
+        .toList();
+
+      if(friendIds.isEmpty){
+        return Stream.value(<QuizMetadata>[]);
+      }
+
+      final List<Stream<List<QuizMetadata>>> quizStreams = friendIds
+        .map((friendId) => this.getMyQuizzesStream(friendId))
+        .toList();
+
+        return CombineLatestStream.list(quizStreams)
+          .map((List<List<QuizMetadata>> listOfQuizLists){
+
+            return listOfQuizLists.expand((quizList) => quizList).toList();
+          });
+    });
+  }
+  
+  Stream<List<QuizMetadata>> getMyQuizzesStream(String? userId) {
+
+    userId ??= AuthService().currentUser!.uid;
     return _firestore
         .collection('quiz')
-        .where('ownerId', isEqualTo: AuthService().currentUser!.uid)
+        .where('ownerId', isEqualTo: userId)
         .snapshots()
         .map((snapshot) {
           return snapshot.docs.map((doc) {
