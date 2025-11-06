@@ -1,5 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // [ZMIANA] Import Firestore
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_quizarena/models/QuizMetadata';
@@ -171,7 +171,6 @@ class _FriendBoardState extends State<FriendBoard>
         );
       }
     } catch (e) {
-      // Transakcja nie powiodła się
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error joining room: ${e.toString()}')),
@@ -186,14 +185,13 @@ class _FriendBoardState extends State<FriendBoard>
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Friends Rooms'), // [ZMIANA] Lepszy tytuł
+        title: const Text('Friends Rooms'),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showCreateRoomDialog(context),
         icon: const Icon(Icons.add),
         label: const Text('New Room'),
       ),
-      // [NOWE] StreamBuilder słucha połączonego strumienia
       body: StreamBuilder<Map<String, dynamic>>(
         stream: _combinedStream,
         builder: (context, snapshot) {
@@ -210,11 +208,9 @@ class _FriendBoardState extends State<FriendBoard>
             return const Center(child: Text('Loading data...'));
           }
 
-          // [NOWE] Rozpakuj połączone dane
           final Set<String> friendIds = snapshot.data!['friendIds'];
           final QuerySnapshot roomsSnapshot = snapshot.data!['roomsSnapshot'];
 
-          // [ZMIANA] Mapowanie QuerySnapshot na listę
           final roomsList = roomsSnapshot.docs.map((doc) {
             return {
               'id': doc.id,
@@ -222,21 +218,18 @@ class _FriendBoardState extends State<FriendBoard>
             };
           }).toList();
 
-          // [NOWE] Kluczowa optymalizacja: Filtrowanie listy pokoi
-          // Pokaż tylko pokoje, gdzie host jest na liście znajomych
           final filteredRooms = roomsList.where((room) {
             final hostId = room['host'];
             return friendIds.contains(hostId);
           }).toList();
 
-          // [ZMIANA] Użyj `filteredRooms` do wyświetlania
           if (filteredRooms.isEmpty) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Text(
-                    'No available rooms from friends.\nCreate one!', // [ZMIANA]
+                    'No available rooms from friends.\nCreate one!',
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 18),
                   ),
@@ -251,9 +244,9 @@ class _FriendBoardState extends State<FriendBoard>
           }
 
           return ListView.builder(
-            itemCount: filteredRooms.length, // [ZMIANA]
+            itemCount: filteredRooms.length,
             itemBuilder: (context, index) {
-              final room = filteredRooms[index]; // [ZMIANA]
+              final room = filteredRooms[index];
               return RoomListItem(
                 room: room,
                 onJoin: (roomID) async {
@@ -270,12 +263,6 @@ class _FriendBoardState extends State<FriendBoard>
   @override
   bool get wantKeepAlive => true;
 }
-
-// ===================================================================
-// Reszta Twojego kodu (Dialog i RoomListItem)
-// Nie wymagały żadnych zmian, ponieważ pobierają dane z `_quizRepository`
-// lub są prostymi widokami.
-// ===================================================================
 
 class _CreateRoomDialog extends StatefulWidget {
   final QuizRepository quizRepository;
@@ -304,8 +291,6 @@ class _CreateRoomDialogState extends State<_CreateRoomDialog> {
   @override
   void initState() {
     super.initState();
-    // [BEZ ZMIAN] Ta linia automatycznie pobierze nową, złączoną listę quizów!
-    // (Publiczne + Własne + Znajomych)
     _quizzesStream = widget.quizRepository.getAvailableQuizzesStream();
   }
 
@@ -380,7 +365,6 @@ class _CreateRoomDialogState extends State<_CreateRoomDialog> {
 
                   final quizzes = snapshot.data!;
 
-                  // Logika do obsługi domyślnego wyboru
                   if (_selectedQuiz != null &&
                       !quizzes.any((q) => q.id == _selectedQuiz!.id)) {
                     _selectedQuiz = null;
@@ -442,7 +426,6 @@ class _CreateRoomDialogState extends State<_CreateRoomDialog> {
                       _selectedQuiz!,
                     );
 
-                    // Użyj `context.mounted` dla bezpieczeństwa
                     if (!context.mounted) return;
 
                     setState(() {
