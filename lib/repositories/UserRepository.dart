@@ -77,4 +77,29 @@ class UserRepository {
       return false; 
     }
   }
+
+Future<Map<String, UserModel>> getUsersMap(Set<String> uids) async {
+    if (uids.isEmpty) {
+      return {};
+    }
+
+    try {
+      final querySnapshot = await _firestore
+          .collection(_usersCollection)
+          .where(FieldPath.documentId, whereIn: uids.toList())
+          .get();
+
+      final Map<String, UserModel> usersMap = {};
+      for (var doc in querySnapshot.docs) {
+        final userData = doc.data() as Map<String, dynamic>;
+        usersMap[doc.id] = UserModel.fromFirestore(userData, doc.id);
+      }
+      
+      return usersMap;
+    } catch (e) {
+      print('Error fetching map of users: $e');
+      return {}; 
+    }
+  }
+
 }
