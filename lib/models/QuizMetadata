@@ -3,14 +3,12 @@ class QuizMetadata {
   final String name;
   final String ownerId;
   final String accessType;
-  final String? ownerName;
 
   QuizMetadata({
     required this.id,
     required this.name,
     required this.ownerId,
     required this.accessType,
-    this.ownerName,
   });
 
   factory QuizMetadata.fromFirestore(Map<String, dynamic> data, String id) {
@@ -19,22 +17,6 @@ class QuizMetadata {
       name: data['name'] ?? 'null',
       ownerId: data['ownerID'] ?? 'null',
       accessType: data['accessType'] ?? 'null',
-      ownerName: data['ownerName'] as String?
-    );
-  }
-
-  QuizMetadata copyWith({
-    String? name,
-    String? ownerId,
-    String? ownerName,
-    String? accessType,
-  }) {
-    return QuizMetadata(
-      id: this.id,
-      name: name ?? this.name,
-      ownerId: ownerId ?? this.ownerId,
-      accessType: accessType ?? this.accessType,
-      ownerName: ownerName ?? this.ownerName,
     );
   }
 }
