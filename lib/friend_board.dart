@@ -1,5 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // [ZMIANA] Import Firestore
+import 'package:cloud_firestore/cloud_firestore.dart' hide Transaction;
+import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_quizarena/models/QuizMetadata';
@@ -8,7 +9,6 @@ import 'package:flutter_quizarena/lobby_screen.dart';
 
 import 'package:rxdart/rxdart.dart';
 import 'package:flutter_quizarena/repositories/FriendRepository.dart';
-import 'package:flutter_quizarena/repositories/UserRepository.dart';
 
 class FriendBoard extends StatefulWidget {
   const FriendBoard({super.key});
@@ -20,47 +20,41 @@ class FriendBoard extends StatefulWidget {
 class _FriendBoardState extends State<FriendBoard>
     with AutomaticKeepAliveClientMixin {
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseDatabase _db = FirebaseDatabase.instance;
+  
   final QuizRepository _quizRepository = QuizRepository();
-
-  // [NOWE] Repozytoria do pobierania listy znajomych
   final FriendRepository _friendRepository = FriendRepository();
-  final UserRepository _userRepository =
-      UserRepository(); // Załóżmy, że jest potrzebne
 
-  // [NOWE] Strumień, który połączy oba źródła danych
   late final Stream<Map<String, dynamic>> _combinedStream;
 
   @override
   void initState() {
     super.initState();
 
-    // [NOWE] Strumień 1: Lista ID znajomych (z FriendRepository)
-    // Zakładam, że Twój UserModel ma pole 'uid'
     final friendIdsStream = _friendRepository
         .streamFriendList(_auth.currentUser!.uid)
-        .map((list) => list.map((user) => user.uid).toSet()); // Użyj Set dla szybszego sprawdzania
+        .map((list) => list.map((user) => user.uid).toSet());
 
-    // [NOWE] Strumień 2: Pokoje (z Firestore)
-    final roomsStream = _firestore
-        .collection('rooms')
-        .where('status', isEqualTo: 'waiting')
-        .snapshots();
+    final roomsStream = _db
+        .ref('rooms')
+        .orderByChild('status')
+        .equalTo('waiting')
+        .onValue;
 
     _combinedStream = Rx.combineLatest2(
       friendIdsStream,
       roomsStream,
-      (Set<String> friendIds, QuerySnapshot roomsSnapshot) {
+      (Set<String> friendIds, DatabaseEvent roomsEvent) {
         return {
           'friendIds': friendIds,
-          'roomsSnapshot': roomsSnapshot,
+          'roomsEvent': roomsEvent,
         };
       },
     );
   }
 
   void _showCreateRoomDialog(BuildContext context) async {
-    final String? newRoomId = await showDialog<String?>(
+     final String? newRoomId = await showDialog<String?>(
       context: context,
       barrierDismissible: false,
       builder: (BuildContext dialogContext) {
@@ -89,36 +83,40 @@ class _FriendBoardState extends State<FriendBoard>
     }
   }
 
-  Future<String?> _createRoom(
-      String roomName, int playerLimit, QuizMetadata selectedQuiz) async {
-    final User? user = _auth.currentUser;
-    if (user == null) {
-      return null;
-    }
-
-    final CollectionReference roomsRef = _firestore.collection('rooms');
-
-    final roomData = {
-      'host': user.uid,
-      'roomName': roomName,
-      'status': 'waiting',
-      'playerLimit': playerLimit,
-      'playerCount': 1,
-      'quiz': {'id': selectedQuiz.id, 'title': selectedQuiz.name},
-      'players': {
-        user.uid: {'displayName': user.displayName ?? 'Host'}
-      },
-      'createdAt': FieldValue.serverTimestamp(), 
-    };
-
-    try {
-      final DocumentReference newRoomRef = await roomsRef.add(roomData);
-
-      return newRoomRef.id;
-    } catch (e) {
-      return null;
-    }
+Future<String?> _createRoom(
+    String roomName, int playerLimit, QuizMetadata selectedQuiz) async {
+  final User? user = _auth.currentUser;
+  if (user == null) {
+    return null;
   }
+
+  final DatabaseReference roomsRef = _db.ref('rooms');
+  final DatabaseReference newRoomRef = roomsRef.push();
+
+  final roomData = {
+    'host': user.uid,
+    'roomName': roomName,
+    'status': 'waiting',
+    'playerLimit': playerLimit,
+    'playerCount': 1,
+    'quiz': {'id': selectedQuiz.id, 'title': selectedQuiz.name},
+    'players': {
+      user.uid: {'displayName': user.displayName ?? 'Host'}
+    },
+    'createdAt': ServerValue.timestamp,
+    'visibility': 'friends',
+
+    'status_visibility': 'waiting_friends', 
+  };
+
+  try {
+    await newRoomRef.set(roomData);
+    await newRoomRef.onDisconnect().remove();
+    return newRoomRef.key;
+  } catch (e) {
+    return null;
+  }
+}
 
   Future<void> _joinRoom(String roomID) async {
     final User? user = _auth.currentUser;
@@ -126,55 +124,71 @@ class _FriendBoardState extends State<FriendBoard>
       return;
     }
 
-    final DocumentReference roomRef = _firestore.collection('rooms').doc(roomID);
+    final DatabaseReference roomRef = _db.ref('rooms/$roomID');
 
     try {
-      await _firestore.runTransaction((Transaction transaction) async {
-        final DocumentSnapshot roomSnapshot = await transaction.get(roomRef);
+      final TransactionResult result = await roomRef.runTransaction(
+        (Object? roomData) {
+          if (roomData == null) {
+            return Transaction.abort();
+          }
 
-        if (!roomSnapshot.exists) {
-          throw Exception("Room does not exist.");
-        }
+          Map<String, dynamic> room;
+          if (roomData is Map) {
+            room = Map<String, dynamic>.from(roomData.cast<String, dynamic>());
+          } else {
+            return Transaction.abort();
+          }
+          
+          if (room['players'] != null && room['players'] is Map) {
+             room['players'] = Map<String, dynamic>.from(room['players'].cast<String, dynamic>());
+          } else {
+             room['players'] = <String, dynamic>{};
+          }
 
-        final Map<String, dynamic> room =
-            roomSnapshot.data() as Map<String, dynamic>;
 
-        final bool isWaiting = room['status'] == 'waiting';
-        final bool hasSpace =
-            (room['playerCount'] as int) < (room['playerLimit'] as int);
-        final bool alreadyJoined =
-            (room['players'] as Map).containsKey(user.uid);
+          final bool isWaiting = room['status'] == 'waiting';
+          final bool hasSpace = (room['playerCount'] as int) < (room['playerLimit'] as int);
+          final bool alreadyJoined = (room['players'] as Map).containsKey(user.uid);
 
-        if (isWaiting && hasSpace && !alreadyJoined) {
-          transaction.update(roomRef, {
-            'playerCount': FieldValue.increment(1),
-            'players.${user.uid}': {
+          if (isWaiting && hasSpace && !alreadyJoined) {
+            room['playerCount'] = (room['playerCount'] as int) + 1;
+            (room['players'] as Map)[user.uid] = {
               'displayName': user.displayName ?? 'Player'
-            }
-          });
-        } else if (isWaiting && alreadyJoined) {
-          return;
-        } else {
-          throw Exception(
-              "Failed to join room (full, in game, or does not exist).");
-        }
-      });
+            };
+            return Transaction.success(room);
+          } else if (isWaiting && alreadyJoined) {
+            return Transaction.success(roomData);
+          } else {
+            return Transaction.abort();
+          }
+        },
+      );
 
-      if (mounted) {
-        await Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (context) => LobbyScreen(
-              roomID: roomID,
-              currentUserId: _auth.currentUser!.uid,
+      if (result.committed) {
+        if (mounted) {
+          await Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (context) => LobbyScreen(
+                roomID: roomID,
+                currentUserId: _auth.currentUser!.uid,
+              ),
             ),
-          ),
-        );
+          );
+        }
+      } else {
+         if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content:
+                    Text('Failed to join room (full, in game, or does not exist).')),
+          );
+        }
       }
     } catch (e) {
-      // Transakcja nie powiodła się
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error joining room: ${e.toString()}')),
+          SnackBar(content: Text('Error joining room: $e')),
         );
       }
     }
@@ -186,14 +200,13 @@ class _FriendBoardState extends State<FriendBoard>
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Friends Rooms'), // [ZMIANA] Lepszy tytuł
+        title: const Text('Friends Rooms'),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showCreateRoomDialog(context),
         icon: const Icon(Icons.add),
         label: const Text('New Room'),
       ),
-      // [NOWE] StreamBuilder słucha połączonego strumienia
       body: StreamBuilder<Map<String, dynamic>>(
         stream: _combinedStream,
         builder: (context, snapshot) {
@@ -210,33 +223,31 @@ class _FriendBoardState extends State<FriendBoard>
             return const Center(child: Text('Loading data...'));
           }
 
-          // [NOWE] Rozpakuj połączone dane
           final Set<String> friendIds = snapshot.data!['friendIds'];
-          final QuerySnapshot roomsSnapshot = snapshot.data!['roomsSnapshot'];
+          final DatabaseEvent roomsEvent = snapshot.data!['roomsEvent'];
 
-          // [ZMIANA] Mapowanie QuerySnapshot na listę
-          final roomsList = roomsSnapshot.docs.map((doc) {
-            return {
-              'id': doc.id,
-              ...doc.data() as Map<String, dynamic>,
-            };
-          }).toList();
+          final roomsList = <Map<String, dynamic>>[];
+          final data = roomsEvent.snapshot.value; 
+          if (data != null && data is Map) {
+            data.forEach((key, value) {
+              if (value is Map) {
+                roomsList.add({'id': key, ...Map<String, dynamic>.from(value.cast<String, dynamic>())});
+              }
+            });
+          }
 
-          // [NOWE] Kluczowa optymalizacja: Filtrowanie listy pokoi
-          // Pokaż tylko pokoje, gdzie host jest na liście znajomych
           final filteredRooms = roomsList.where((room) {
             final hostId = room['host'];
             return friendIds.contains(hostId);
           }).toList();
 
-          // [ZMIANA] Użyj `filteredRooms` do wyświetlania
           if (filteredRooms.isEmpty) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Text(
-                    'No available rooms from friends.\nCreate one!', // [ZMIANA]
+                    'No available rooms from friends.\nCreate one!',
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 18),
                   ),
@@ -251,9 +262,9 @@ class _FriendBoardState extends State<FriendBoard>
           }
 
           return ListView.builder(
-            itemCount: filteredRooms.length, // [ZMIANA]
+            itemCount: filteredRooms.length,
             itemBuilder: (context, index) {
-              final room = filteredRooms[index]; // [ZMIANA]
+              final room = filteredRooms[index];
               return RoomListItem(
                 room: room,
                 onJoin: (roomID) async {
@@ -271,12 +282,6 @@ class _FriendBoardState extends State<FriendBoard>
   bool get wantKeepAlive => true;
 }
 
-// ===================================================================
-// Reszta Twojego kodu (Dialog i RoomListItem)
-// Nie wymagały żadnych zmian, ponieważ pobierają dane z `_quizRepository`
-// lub są prostymi widokami.
-// ===================================================================
-
 class _CreateRoomDialog extends StatefulWidget {
   final QuizRepository quizRepository;
   final Future<String?> Function(
@@ -293,7 +298,7 @@ class _CreateRoomDialog extends StatefulWidget {
 }
 
 class _CreateRoomDialogState extends State<_CreateRoomDialog> {
-  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+ final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final TextEditingController _roomNameController = TextEditingController();
   final TextEditingController _limitController = TextEditingController();
 
@@ -304,8 +309,6 @@ class _CreateRoomDialogState extends State<_CreateRoomDialog> {
   @override
   void initState() {
     super.initState();
-    // [BEZ ZMIAN] Ta linia automatycznie pobierze nową, złączoną listę quizów!
-    // (Publiczne + Własne + Znajomych)
     _quizzesStream = widget.quizRepository.getAvailableQuizzesStream();
   }
 
@@ -380,7 +383,6 @@ class _CreateRoomDialogState extends State<_CreateRoomDialog> {
 
                   final quizzes = snapshot.data!;
 
-                  // Logika do obsługi domyślnego wyboru
                   if (_selectedQuiz != null &&
                       !quizzes.any((q) => q.id == _selectedQuiz!.id)) {
                     _selectedQuiz = null;
@@ -390,7 +392,7 @@ class _CreateRoomDialogState extends State<_CreateRoomDialog> {
                   }
 
                   return DropdownButtonFormField<QuizMetadata>(
-                    value: _selectedQuiz,
+                    initialValue: _selectedQuiz,
                     hint: const Text('Select a Quiz'),
                     isExpanded: true,
                     decoration:
@@ -424,8 +426,8 @@ class _CreateRoomDialogState extends State<_CreateRoomDialog> {
       ),
       actions: [
         TextButton(
-          child: const Text('Cancel'),
           onPressed: _isCreating ? null : () => Navigator.of(context).pop(null),
+          child: const Text('Cancel'),
         ),
         ElevatedButton(
           onPressed: _isCreating
@@ -442,7 +444,6 @@ class _CreateRoomDialogState extends State<_CreateRoomDialog> {
                       _selectedQuiz!,
                     );
 
-                    // Użyj `context.mounted` dla bezpieczeństwa
                     if (!context.mounted) return;
 
                     setState(() {

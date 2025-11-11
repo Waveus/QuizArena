@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 class QuizPage extends StatelessWidget {
-  // Ten ekran MUSI przyjąć quizId, żeby wiedzieć, jakie pytania wczytać
   final String quizId;
 
   const QuizPage({

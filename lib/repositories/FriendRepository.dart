@@ -2,7 +2,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_quizarena/models/User';
-import 'package:flutter_quizarena/models/FriendRequestModel';
 import 'package:rxdart/rxdart.dart';
 
 class FriendRepository {
@@ -83,7 +82,7 @@ class FriendRepository {
         .asyncMap((QuerySnapshot requestSnapshot) async {            
                 final senderUids = requestSnapshot.docs
                 .map((doc) => (doc.data()! as Map<String, dynamic>)['sender'] as String)
-                .toList();  //Test
+                .toList();
             if (senderUids.isEmpty) {
                 return [];
             }
@@ -122,7 +121,7 @@ Stream<List<UserModel>> streamFriendList(String userId) {
 
 Future<void> handleFriendRequest(String senderId, String action) async {
   if (_auth.currentUser == null) {
-      throw Exception('User not authenticated.');
+      throw Exception('Użytkownik nie jest zalogowany. Brak tokena uwierzytelniającego.');
     }
     try {
       final HttpsCallable callable = _functions.httpsCallable('handleFriendRequest');

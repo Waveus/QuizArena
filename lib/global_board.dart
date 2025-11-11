@@ -6,6 +6,7 @@ import 'package:flutter_quizarena/models/QuizMetadata';
 import 'package:flutter_quizarena/repositories/QuizRepository.dart';
 import 'package:flutter_quizarena/lobby_screen.dart';
 
+
 class GlobalBoard extends StatefulWidget {
   const GlobalBoard({super.key});
 
@@ -68,13 +69,15 @@ class _GlobalBoardState extends State<GlobalBoard>
       'quiz': {'id': selectedQuiz.id, 'title': selectedQuiz.name},
       'players': {
         user.uid: {'displayName': user.displayName ?? 'Host'}
-      }
+      },
+      'createdAt': ServerValue.timestamp,
+      'visibility': 'public',
+      'status_visibility': 'waiting_public',
     };
 
     try {
       await newRoomRef.set(roomData);
-      await newRoomRef.get();
-      await newRoomRef.onDisconnect().remove(); 
+      await newRoomRef.onDisconnect().remove();
       return newRoomRef.key;
     } catch (e) {
       return null;
@@ -98,34 +101,30 @@ class _GlobalBoardState extends State<GlobalBoard>
 
           Map<String, dynamic> room;
           if (roomData is Map) {
-            room = Map<String, dynamic>.from(roomData);
+            room = Map<String, dynamic>.from(roomData.cast<String, dynamic>());
           } else {
             return Transaction.abort();
           }
+          
+          if (room['players'] != null && room['players'] is Map) {
+             room['players'] = Map<String, dynamic>.from(room['players'].cast<String, dynamic>());
+          } else {
+             room['players'] = <String, dynamic>{};
+          }
 
           final bool isWaiting = room['status'] == 'waiting';
-          final bool hasSpace = (room['playerCount'] is int &&
-                  room['playerLimit'] is int)
-              ? (room['playerCount'] as int) < (room['playerLimit'] as int)
-              : false;
-          final bool alreadyJoined =
-              (room['players'] as Map?)?.containsKey(user.uid) ?? false;
+          final bool hasSpace = (room['playerCount'] as int) < (room['playerLimit'] as int);
+          final bool alreadyJoined = (room['players'] as Map).containsKey(user.uid);
 
           if (isWaiting && hasSpace && !alreadyJoined) {
             room['playerCount'] = (room['playerCount'] as int) + 1;
-
-            if (room['players'] is! Map) {
-              room['players'] = <String, dynamic>{};
-            }
-
             (room['players'] as Map)[user.uid] = {
               'displayName': user.displayName ?? 'Player'
             };
             return Transaction.success(room);
+          } else if (isWaiting && alreadyJoined) {
+            return Transaction.success(roomData); 
           } else {
-            if (isWaiting && alreadyJoined) {
-               return Transaction.success(roomData); 
-            }
             return Transaction.abort();
           }
         },
@@ -164,9 +163,10 @@ class _GlobalBoardState extends State<GlobalBoard>
   Widget build(BuildContext context) {
     super.build(context);
 
-    final Query roomsQuery =
-        _db.ref('rooms').orderByChild('status').equalTo('waiting');
-
+    final Query roomsQuery = _db
+        .ref('rooms')
+        .orderByChild('status_visibility') 
+        .equalTo('waiting_public');       
     return Scaffold(
       appBar: AppBar(
         title: const Text('Available Rooms'),
@@ -194,7 +194,7 @@ class _GlobalBoardState extends State<GlobalBoard>
           if (data != null && data is Map) {
             data.forEach((key, value) {
               if (value is Map) {
-                roomsList.add({'id': key, ...Map<String, dynamic>.from(value)});
+                roomsList.add({'id': key, ...Map<String, dynamic>.from(value.cast<String, dynamic>())});
               }
             });
           }
@@ -269,6 +269,13 @@ class _CreateRoomDialogState extends State<_CreateRoomDialog> {
     super.initState();
     _quizzesStream = widget.quizRepository.getAvailableQuizzesStream();
   }
+  
+  @override
+  void dispose() {
+    _roomNameController.dispose();
+    _limitController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -333,21 +340,17 @@ class _CreateRoomDialogState extends State<_CreateRoomDialog> {
                   }
 
                   final quizzes = snapshot.data!;
-
+                  
                   if (_selectedQuiz != null &&
                       !quizzes.any((q) => q.id == _selectedQuiz!.id)) {
                     _selectedQuiz = null;
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      if (mounted) setState(() {});
-                    });
                   }
-                  
                   if (_selectedQuiz == null && quizzes.isNotEmpty) {
                     _selectedQuiz = quizzes.first;
                   }
 
                   return DropdownButtonFormField<QuizMetadata>(
-                    value: _selectedQuiz,
+                    initialValue: _selectedQuiz,
                     hint: const Text('Select a Quiz'),
                     isExpanded: true,
                     decoration:
@@ -381,40 +384,49 @@ class _CreateRoomDialogState extends State<_CreateRoomDialog> {
       ),
       actions: [
         TextButton(
-          child: const Text('Cancel'),
           onPressed: _isCreating ? null : () => Navigator.of(context).pop(null),
+          child: const Text('Cancel'),
         ),
         ElevatedButton(
-          child: _isCreating 
-              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) 
+          onPressed: _isCreating
+              ? null
+              : () async {
+                  if (_formKey.currentState!.validate()) {
+                    setState(() {
+                      _isCreating = true;
+                    });
+
+                    final createdId = await widget.onCreateRoom(
+                      _roomNameController.text.trim(),
+                      int.parse(_limitController.text),
+                      _selectedQuiz!,
+                    );
+
+                    if (!context.mounted) return; 
+                    
+                    setState(() {
+                      _isCreating = false;
+                    });
+
+                    if (createdId != null) {
+                      Navigator.of(context).pop(createdId);
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                          content: Text(
+                              'Failed to create room. Please try again.')));
+                    }
+                  } else {
+                     ScaffoldMessenger.of(context).showSnackBar(
+                       const SnackBar(content: Text('Form validation failed!')));
+                  }
+                },
+          child: _isCreating
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white))
               : const Text('Create'),
-          onPressed: _isCreating ? null : () async {
-            if (_formKey.currentState!.validate()) {
-              setState(() { _isCreating = true; }); 
-
-              final createdId = await widget.onCreateRoom(
-                _roomNameController.text.trim(),
-                int.parse(_limitController.text),
-                _selectedQuiz!,
-              );
-
-              if (mounted) {
-                 setState(() { _isCreating = false; });
-              }
-             
-              if (createdId != null && mounted) {
-                Navigator.of(context).pop(createdId);
-              } else if (mounted) {
-                 ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Failed to create room. Please try again.')));
-              }
-            } else {
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Form validation failed!')));
-              }
-            }
-          },
         ),
       ],
     );

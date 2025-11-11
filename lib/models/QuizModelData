@@ -1,0 +1,59 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+class Answer {
+  final String text;
+  final bool isCorrect;
+
+  Answer({required this.text, required this.isCorrect});
+}
+
+
+class Question {
+  final String id;
+  final String text;
+  final List<Answer> answers;  final int index;
+
+  Question({
+    required this.id,
+    required this.text,
+    required this.answers,
+    required this.index,
+  });
+
+  factory Question.fromFirestore(DocumentSnapshot doc) {
+    Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+
+    final answersMap = data['answers'] as Map<String, dynamic>? ?? {};
+    final correctKey = data['correctAnswear'] as String?;
+    final List<Answer> parsedAnswers = [];
+    final sortedKeys = answersMap.keys.toList()..sort();
+
+    for (var key in sortedKeys) {
+      final text = answersMap[key] as String;
+      parsedAnswers.add(Answer(
+        text: text,
+        isCorrect: key == correctKey,
+      ));
+    }
+    while (parsedAnswers.length < 4) {
+      parsedAnswers.add(Answer(text: 'Brak odp.', isCorrect: false));
+    }
+    
+    final index = int.tryParse(data['index'] ?? '99') ?? 99;
+
+    return Question(
+      id: doc.id,
+      text: data['text'] ?? 'Brak treści pytania',
+      answers: parsedAnswers,
+      index: index,
+    );
+  }
+}
+
+class Quiz {
+  final String id;
+  final String name;
+  final List<Question> questions;
+
+  Quiz({required this.id, required this.name, required this.questions});
+}

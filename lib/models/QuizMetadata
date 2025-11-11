@@ -1,3 +1,5 @@
+import 'package:flutter_quizarena/models/QuizModelData';
+
 class QuizMetadata {
   final String id;
   final String name;
