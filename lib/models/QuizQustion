@@ -1,0 +1,27 @@
+class QuizQuestion {
+
+  final String id;
+  final String text;
+  final Map<String, String> answers;
+  final String correctAnswer;
+
+  QuizQuestion({
+    required this.id,
+    required this.text,
+    required this.answers,
+    required this.correctAnswer,
+  });
+
+
+
+
+
+  factory QuizQuestion.fromFirestore(Map<String, dynamic> data, String id) {
+    return QuizQuestion(
+      id: id,
+      text: data['text'] ?? '',
+      answers: Map<String, String>.from(data['answers'] ?? {}),
+      correctAnswer: data['correctAnswer'] ?? '',
+    );
+  }
+}

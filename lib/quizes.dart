@@ -94,7 +94,6 @@ class Quizes extends StatelessWidget {
     );
   }
 
-  // Mała funkcja pomocnicza do wybierania ikonek na podstawie 'type'
   IconData _getIconForType(int type) {
     switch (type) {
       case 1:
